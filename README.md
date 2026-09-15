@@ -8,7 +8,8 @@ your preferences, and shows the valid schedules on a weekly calendar.
 
 > Status: early development — the frontend, backend and database are connected, the database
 > schema is in place, the API supports registration, login and JWT authentication, and students can search the
-> course catalog and build a course selection. Features are being built in the phases described in
+> course catalog and build a course selection. The backend can detect time conflicts between
+> sections. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -127,6 +128,16 @@ These endpoints are public. Missing courses and sections return 404. Meeting day
 
 The sample catalog (`python -m app.seed`) has the 12 courses listed in PRD §33, each with
 3 sections: 36 sections and 94 weekly meeting times.
+
+## Scheduling logic
+
+Conflict detection lives in [backend/app/services/schedule_service.py](backend/app/services/schedule_service.py):
+
+- `times_overlap(start_a, end_a, start_b, end_b)` is `start_a < end_b and start_b < end_a`.
+  The comparisons are strict, so a class ending at 11:00 and one starting at 11:00 don't overlap.
+- `meetings_conflict(a, b)` is true only when both meetings are on the same day and their times overlap.
+- `sections_conflict(a, b)` compares every meeting of one section with every meeting of the other
+  (at most `meetings_a × meetings_b` checks) and stops at the first conflict.
 
 ## Tests
 
