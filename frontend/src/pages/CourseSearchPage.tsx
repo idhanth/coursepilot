@@ -7,12 +7,23 @@ import type { Course } from '../types/course.ts'
 // A finished search, remembering which query it was for.
 type SearchResult = { query: string; kind: 'ready'; courses: Course[] } | { query: string; kind: 'error'; message: string }
 
-export default function CourseSearchPage() {
+type CourseSearchPageProps = {
+  // The selection is owned by App, so it is still there on the schedule builder and results pages.
+  selectedCourses: Course[]
+  onAddCourse: (course: Course) => void
+  onRemoveCourse: (courseId: number) => void
+  onClearCourses: () => void
+}
+
+export default function CourseSearchPage({
+  selectedCourses,
+  onAddCourse,
+  onRemoveCourse,
+  onClearCourses,
+}: CourseSearchPageProps) {
   const [input, setInput] = useState('') // what is typed in the search box
   const [submittedQuery, setSubmittedQuery] = useState('') // the last search submitted; '' means all courses
   const [result, setResult] = useState<SearchResult | null>(null)
-  // The temporary course selection. It lives only in this page's state for now.
-  const [selectedCourses, setSelectedCourses] = useState<Course[]>([])
 
   // Runs when the page first loads and again whenever a new search is submitted.
   useEffect(() => {
@@ -46,20 +57,6 @@ export default function CourseSearchPage() {
     setSubmittedQuery('')
   }
 
-  function addCourse(course: Course) {
-    setSelectedCourses((selected) =>
-      selected.some((existing) => existing.id === course.id) ? selected : [...selected, course],
-    )
-  }
-
-  function removeCourse(courseId: number) {
-    setSelectedCourses((selected) => selected.filter((course) => course.id !== courseId))
-  }
-
-  function clearSelection() {
-    setSelectedCourses([])
-  }
-
   const selectedIds = new Set(selectedCourses.map((course) => course.id))
 
   return (
@@ -69,7 +66,7 @@ export default function CourseSearchPage() {
         Search by course code, course name, or department, then add the courses you want to take.
       </p>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <section aria-label="Course results">
           <form role="search" onSubmit={handleSubmit} className="flex gap-2">
             <label htmlFor="course-search" className="sr-only">
@@ -128,8 +125,8 @@ export default function CourseSearchPage() {
                       <CourseCard
                         course={course}
                         isSelected={selectedIds.has(course.id)}
-                        onAdd={addCourse}
-                        onRemove={removeCourse}
+                        onAdd={onAddCourse}
+                        onRemove={onRemoveCourse}
                       />
                     </li>
                   ))}
@@ -139,7 +136,7 @@ export default function CourseSearchPage() {
           )}
         </section>
 
-        <SelectedCoursesPanel courses={selectedCourses} onRemove={removeCourse} onClear={clearSelection} />
+        <SelectedCoursesPanel courses={selectedCourses} onRemove={onRemoveCourse} onClear={onClearCourses} />
       </div>
     </main>
   )

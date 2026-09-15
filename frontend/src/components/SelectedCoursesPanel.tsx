@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { Course } from '../types/course.ts'
 
 type SelectedCoursesPanelProps = {
@@ -29,24 +30,32 @@ export default function SelectedCoursesPanel({ courses, onRemove, onClear }: Sel
           No courses selected yet. Choose <span className="font-medium">Add</span> on a course to include it.
         </p>
       ) : (
-        <ul className="mt-3 divide-y divide-slate-100">
-          {courses.map((course) => (
-            <li key={course.id} className="flex items-center justify-between gap-3 py-2">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">{course.course_code}</p>
-                <p className="truncate text-sm text-slate-600">{course.course_name}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onRemove(course.id)}
-                aria-label={`Remove ${course.course_code}`}
-                className="shrink-0 text-sm font-medium text-red-700 hover:text-red-900"
-              >
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-3 divide-y divide-slate-100">
+            {courses.map((course) => (
+              <li key={course.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900">{course.course_code}</p>
+                  <p className="truncate text-sm text-slate-600">{course.course_name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemove(course.id)}
+                  aria-label={`Remove ${course.course_code}`}
+                  className="shrink-0 text-sm font-medium text-red-700 hover:text-red-900"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/planner"
+            className="mt-3 block rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-800"
+          >
+            Build Schedule
+          </Link>
+        </>
       )}
     </aside>
   )

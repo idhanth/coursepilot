@@ -1,0 +1,192 @@
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../services/api.ts'
+import { generateSchedules } from '../services/schedules.ts'
+import type { Course } from '../types/course.ts'
+import {
+  EMPTY_PREFERENCES,
+  type GenerateSchedulesResponse,
+  type GeneratedSchedule,
+  type PreferenceForm,
+} from '../types/schedule.ts'
+import ResultsPage from './ResultsPage.tsx'
+
+// Replace the real API call, so each test decides what the "backend" returns.
+vi.mock('../services/schedules.ts', () => ({ generateSchedules: vi.fn() }))
+const mockGenerateSchedules = vi.mocked(generateSchedules)
+
+const COURSES: Course[] = [
+  { id: 2, course_code: 'CSCI 1302', course_name: 'Software Development', department: 'Computer Science', description: null, credit_hours: 4 },
+  { id: 5, course_code: 'MATH 2250', course_name: 'Calculus I', department: 'Mathematics', description: null, credit_hours: 4 },
+]
+
+/** A schedule whose CSCI 1302 section number is `csciSection`, so tests can tell schedules apart. */
+function schedule(csciSection: string): GeneratedSchedule {
+  return {
+    total_credits: 8,
+    sections: [
+      {
+        id: Number(csciSection),
+        course_id: 2,
+        section_number: csciSection,
+        instructor: 'Dr. Smith',
+        location: 'Boyd 328',
+        meetings: [
+          { day_of_week: 0, start_time: '10:20:00', end_time: '11:10:00' },
+          { day_of_week: 2, start_time: '10:20:00', end_time: '11:10:00' },
+          { day_of_week: 4, start_time: '10:20:00', end_time: '11:10:00' },
+        ],
+        course: { id: 2, course_code: 'CSCI 1302', course_name: 'Software Development', credit_hours: 4 },
+      },
+      {
+        id: 100,
+        course_id: 5,
+        section_number: '003',
+        instructor: 'Dr. Chen',
+        location: 'Boyd 322',
+        meetings: [
+          { day_of_week: 1, start_time: '09:35:00', end_time: '10:50:00' },
+          { day_of_week: 3, start_time: '09:35:00', end_time: '10:50:00' },
+        ],
+        course: { id: 5, course_code: 'MATH 2250', course_name: 'Calculus I', credit_hours: 4 },
+      },
+    ],
+  }
+}
+
+function backendResponse(counts: { total: number; conflictFree: number }, schedules: GeneratedSchedule[]): GenerateSchedulesResponse {
+  return {
+    total_combinations: counts.total,
+    conflict_free_count: counts.conflictFree,
+    count: schedules.length,
+    schedules,
+  }
+}
+
+function renderResults(selectedCourses: Course[] = COURSES, preferences: PreferenceForm = EMPTY_PREFERENCES) {
+  render(
+    <MemoryRouter>
+      <ResultsPage selectedCourses={selectedCourses} preferences={preferences} />
+    </MemoryRouter>,
+  )
+}
+
+function counts() {
+  return screen.getAllByRole('definition').map((element) => element.textContent)
+}
+
+beforeEach(() => {
+  mockGenerateSchedules.mockReset()
+})
+
+describe('ResultsPage', () => {
+  it('asks the user to pick courses instead of calling the backend when none are selected', () => {
+    renderResults([])
+
+    expect(screen.getByRole('heading', { name: 'No courses selected' })).toBeDefined()
+    expect(mockGenerateSchedules).not.toHaveBeenCalled()
+  })
+
+  it('sends the selected courses and filled-in preferences, and shows loading until the response arrives', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
+
+    renderResults(COURSES, { ...EMPTY_PREFERENCES, earliestStart: '09:00', preferredDayOff: 'Friday' })
+
+    expect(screen.getByRole('status').textContent).toBe('Generating schedules…')
+    expect(mockGenerateSchedules).toHaveBeenCalledWith({
+      course_ids: [2, 5],
+      preferences: { earliest_start: '09:00', preferred_day_off: 'Friday' },
+    })
+    expect(await screen.findByText('Schedule 1 of 1')).toBeDefined()
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByText('Preferences: No classes before 9:00 AM · Friday off')).toBeDefined()
+  })
+
+  it('shows the three counts and the first schedule', async () => {
+    mockGenerateSchedules.mockResolvedValue(
+      backendResponse({ total: 81, conflictFree: 63 }, [schedule('001'), schedule('002'), schedule('003')]),
+    )
+
+    renderResults()
+
+    expect(await screen.findByText('Schedule 1 of 3')).toBeDefined()
+    expect(counts()).toEqual(['81', '63', '3'])
+    expect(screen.getByText('CSCI 1302-001')).toBeDefined()
+    expect(screen.getByText('MWF 10:20 AM–11:10 AM')).toBeDefined()
+    expect(screen.getByText('8 credits')).toBeDefined()
+    // 3 CSCI meetings + 2 MATH meetings on the weekly calendar.
+    expect(screen.getAllByTestId('calendar-block')).toHaveLength(5)
+  })
+
+  it('moves between schedules with Previous and Next, rendering only one at a time', async () => {
+    mockGenerateSchedules.mockResolvedValue(
+      backendResponse({ total: 81, conflictFree: 63 }, [schedule('001'), schedule('002'), schedule('003')]),
+    )
+    renderResults()
+    await screen.findByText('Schedule 1 of 3')
+    const previous = screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement
+    const next = screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement
+
+    expect(previous.disabled).toBe(true)
+
+    fireEvent.click(next)
+    expect(screen.getByText('Schedule 2 of 3')).toBeDefined()
+    expect(screen.getByText('CSCI 1302-002')).toBeDefined()
+    expect(screen.queryByText('CSCI 1302-001')).toBeNull()
+
+    fireEvent.click(next)
+    expect(screen.getByText('Schedule 3 of 3')).toBeDefined()
+    expect(next.disabled).toBe(true)
+
+    fireEvent.click(previous)
+    expect(screen.getByText('Schedule 2 of 3')).toBeDefined()
+    expect(screen.getAllByTestId('calendar-block')).toHaveLength(5)
+  })
+
+  it('disables both buttons when there is exactly one schedule', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 1 }, [schedule('001')]))
+    renderResults()
+
+    await screen.findByText('Schedule 1 of 1')
+
+    const navigation = screen.getByRole('navigation', { name: 'Schedule navigation' })
+    for (const button of within(navigation).getAllByRole('button') as HTMLButtonElement[]) {
+      expect(button.disabled).toBe(true)
+    }
+  })
+
+  it('explains that the courses cannot fit together when no combination is conflict-free', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 4, conflictFree: 0 }, []))
+    renderResults()
+
+    expect(await screen.findByRole('heading', { name: "These courses can't fit together" })).toBeDefined()
+    expect(screen.getByText(/Every one of the 4 section combinations has a time conflict/)).toBeDefined()
+    expect(counts()).toEqual(['4', '0', '0'])
+    expect(screen.queryByRole('navigation', { name: 'Schedule navigation' })).toBeNull()
+  })
+
+  it('explains that preferences are too strict when conflict-free schedules were all filtered out', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 81, conflictFree: 63 }, []))
+    renderResults(COURSES, { ...EMPTY_PREFERENCES, preferredDayOff: 'Friday' })
+
+    expect(await screen.findByRole('heading', { name: 'No schedules match your preferences' })).toBeDefined()
+    expect(screen.getByText(/63 conflict-free schedules exist, but your preferences rule out all of them/)).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Edit preferences' }).getAttribute('href')).toBe('/planner')
+  })
+
+  it('shows the error and tries again when asked', async () => {
+    mockGenerateSchedules
+      .mockRejectedValueOnce(new ApiError(0, 'The CoursePilot server is unavailable.'))
+      .mockResolvedValueOnce(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
+    renderResults()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('The CoursePilot server is unavailable.')
+
+    fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('Schedule 1 of 1')).toBeDefined()
+    expect(mockGenerateSchedules).toHaveBeenCalledTimes(2)
+  })
+})

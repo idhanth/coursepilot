@@ -10,7 +10,8 @@ your preferences, and shows the valid schedules on a weekly calendar.
 > schema is in place, the API supports registration, login and JWT authentication, and students can search the
 > course catalog and build a course selection. The backend can detect time conflicts between
 > sections and generate every conflict-free schedule for a set of courses, filtered by optional
-> time and day preferences. Features are being built in the phases described in
+> time and day preferences. The frontend runs the whole flow: search, select, set preferences,
+> generate, and browse the results on a weekly calendar. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -196,11 +197,28 @@ either keeps a schedule or removes it; nothing is ranked. Leaving a preference o
 Malformed values, a `latest_end` that isn't after `earliest_start`, and unknown preference names
 return 422.
 
+## Frontend flow
+
+| Page                | What happens                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `/courses`          | Search the catalog, view sections, and add courses to the selection                 |
+| `/planner`          | Review the selection and set the 4 optional preferences                             |
+| `/results`          | Calls `POST /api/schedules/generate` and shows one schedule at a time with its counts |
+
+The selection and preferences are React state in `App.tsx`, passed to the pages as props, so every
+page sees the same values (a page refresh clears them). The results page shows the backend's three
+counts, a section list and a weekly calendar for the current schedule, with Previous and Next to
+move through the rest. When nothing is returned, it uses the counts to say whether the courses
+conflict (`conflict_free_count` is 0) or the preferences removed every schedule.
+
 ## Tests
 
 ```bash
 cd backend
 .venv/bin/pytest
+
+cd frontend
+npm test          # Vitest: request building, calendar layout, and the planner and results pages
 ```
 
 The tests use the `coursepilot_test` database, which they rebuild from the migrations on every
