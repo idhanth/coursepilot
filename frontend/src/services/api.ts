@@ -1,7 +1,8 @@
 import { clearToken, getToken } from './token.ts'
 
-// Empty in development (Vite proxies /api); the backend's URL in production.
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
+// Empty in development (Vite proxies /api); the backend's URL in production. A trailing slash is dropped,
+// so "https://api.example.com/" doesn't turn "/api/courses" into "//api/courses".
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 
 export class ApiError extends Error {
   status: number
@@ -51,7 +52,10 @@ async function request<T>(path: string, init: RequestInit, { auth = false }: Req
   }
 
   if (response.status === 204) {
-    return undefined as T // No Content, e.g. after a delete
+    // No Content, e.g. after a delete. The empty body is still read to the end: if it is left unread,
+    // Chrome cancels the request and shows a successful delete as failed (net::ERR_ABORTED).
+    await response.text()
+    return undefined as T
   }
   return response.json() as Promise<T>
 }

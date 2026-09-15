@@ -19,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   setUnauthorizedHandler(null)
 })
 
@@ -104,10 +105,26 @@ describe('api', () => {
     await expect(apiGet('/api/courses')).rejects.toThrow('Request failed with status 418.')
   })
 
-  it('resolves a 204 No Content response without reading a body', async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+  it('reads a 204 No Content response to the end so the browser does not cancel the request', async () => {
+    // Regression: returning without reading the empty body made Chrome report every successful
+    // DELETE as canceled (net::ERR_ABORTED). A plain object stands in for the response, because a
+    // test Response with status 204 can't have the body stream that Chrome gives it.
+    const text = vi.fn(async () => '')
+    fetchMock.mockResolvedValue({ ok: true, status: 204, text } as unknown as Response)
 
     await expect(apiDelete('/api/schedules/saved/3', { auth: true })).resolves.toBeUndefined()
     expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe('DELETE')
+    expect(text).toHaveBeenCalledOnce()
+  })
+
+  it('ignores a trailing slash on VITE_API_URL', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://coursepilot-api.example.com/')
+    vi.resetModules() // api.ts reads the variable when it is first imported
+    const freshApi = await import('./api.ts')
+    fetchMock.mockResolvedValue(jsonResponse(200, []))
+
+    await freshApi.apiGet('/api/courses')
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://coursepilot-api.example.com/api/courses')
   })
 })

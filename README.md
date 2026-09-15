@@ -263,6 +263,41 @@ run. Point them elsewhere with `TEST_DATABASE_URL`.
 
 Copy the `.env.example` files to `.env` to override them. `.env` files are never committed.
 
+## Deployment
+
+| Part     | Host                           | Configuration                                                                                   |
+| -------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Frontend | Vercel                         | Root directory `frontend`, build `npm run build`, output `dist`. `frontend/vercel.json` sends every path to `index.html`, so routes such as `/saved/3` work when refreshed. |
+| API      | Render (free web service)      | `render.yaml`: root directory `backend`, build `pip install -r requirements.txt`, start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health check `/api/health`. Python version from `backend/.python-version`. |
+| Database | Neon (managed PostgreSQL)      | Created and migrated once; see below.                                                           |
+
+```text
+Browser ──HTTPS──> Vercel (static React build)
+   │
+   └──HTTPS, Authorization: Bearer <JWT>──> Render (FastAPI) ──TLS──> Neon (PostgreSQL)
+```
+
+Production environment variables (set in each host's dashboard, never committed):
+
+| Host   | Variable       | Value                                                                                  |
+| ------ | -------------- | -------------------------------------------------------------------------------------- |
+| Render | `DATABASE_URL` | The Neon connection string. `postgresql://` URLs are switched to the psycopg driver automatically. |
+| Render | `JWT_SECRET`   | A new random value used only in production (at least 32 characters).                   |
+| Render | `FRONTEND_URL` | The exact Vercel origin, e.g. `https://example.vercel.app`. CORS allows only this origin. |
+| Vercel | `VITE_API_URL` | The Render service URL. It is built into the JavaScript bundle, so redeploy after changing it. |
+
+Create the tables and load the sample catalog once, from `backend/`, with the production
+connection string:
+
+```bash
+DATABASE_URL='<Neon connection string>' JWT_SECRET='<the production secret>' .venv/bin/alembic upgrade head
+DATABASE_URL='<Neon connection string>' JWT_SECRET='<the production secret>' .venv/bin/python -m app.seed
+```
+
+Render's free plan stops the API after a period of inactivity, so the first request after a
+break can be slow while it starts again; the app shows "Can't reach the CoursePilot server right
+now" with a Try again button if that request times out.
+
 ## License
 
 [MIT](LICENSE)
