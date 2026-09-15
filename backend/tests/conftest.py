@@ -1,4 +1,8 @@
 import os
+
+# Settings are read when the app is first imported, so test values must be set before the imports below.
+os.environ.setdefault("JWT_SECRET", "test-only-secret-that-is-at-least-32-characters")
+
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -62,6 +66,7 @@ def client_for(database_url: str) -> TestClient:
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+def client(db: Session) -> Iterator[TestClient]:
+    """A test client on the test database, emptied before each test (via the db fixture)."""
     yield client_for(TEST_DATABASE_URL)
     app.dependency_overrides.clear()
