@@ -49,12 +49,17 @@ describe('DashboardPage', () => {
   })
 
   it('shows the error instead of an empty list when saved schedules cannot be loaded', async () => {
-    mockList.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+    mockList.mockRejectedValueOnce(new ApiError(0, 'The CoursePilot server is unavailable.')).mockResolvedValueOnce(SAVED)
     renderDashboard()
 
     expect((await screen.findByRole('alert')).textContent).toBe('The CoursePilot server is unavailable.')
     expect(screen.queryByText('Loading saved schedules…')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'No saved schedules yet' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('Fall 2027 - Late Start')).toBeDefined()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('shows an empty state when nothing is saved', async () => {

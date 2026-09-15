@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react'
+import { inputClass, labelClass } from '../styles.ts'
 import { DAY_NAMES, EMPTY_PREFERENCES, type PreferenceForm } from '../types/schedule.ts'
 
 type PreferencesFormProps = {
   value: PreferenceForm
   onChange: (value: PreferenceForm) => void
 }
-
-const inputClass =
-  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 focus:outline-none'
 
 // Weekend days are valid for the backend, but no sample course meets then, so only weekdays are offered.
 const WEEKDAYS = DAY_NAMES.slice(0, 5)
@@ -75,7 +73,7 @@ export default function PreferencesForm({ value, onChange }: PreferencesFormProp
       <button
         type="button"
         onClick={() => onChange(EMPTY_PREFERENCES)}
-        className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-900"
+        className="mt-4 rounded text-sm font-medium text-slate-500 hover:text-slate-900"
       >
         Clear preferences
       </button>
@@ -86,7 +84,7 @@ export default function PreferencesForm({ value, onChange }: PreferencesFormProp
 function Field({ id, label, hint, children }: { id: string; label: string; hint: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-800">
+      <label htmlFor={id} className={labelClass}>
         {label}
       </label>
       <div className="mt-1">{children}</div>

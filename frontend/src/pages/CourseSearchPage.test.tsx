@@ -67,11 +67,20 @@ describe('CourseSearchPage', () => {
     expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('')
   })
 
-  it('shows the error when courses cannot be loaded', async () => {
-    mockList.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+  it('shows the error when courses cannot be loaded, and loads them again on Try again', async () => {
+    mockList
+      .mockRejectedValueOnce(new ApiError(0, "Can't reach the CoursePilot server. Check your connection and try again."))
+      .mockResolvedValueOnce([CSCI])
     renderSearch()
 
-    expect((await screen.findByRole('alert')).textContent).toBe('The CoursePilot server is unavailable.')
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "Can't reach the CoursePilot server. Check your connection and try again.",
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('All 1 course')).toBeDefined()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('reports Add and Remove to the parent, which owns the selection', async () => {

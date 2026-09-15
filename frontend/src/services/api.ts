@@ -35,7 +35,8 @@ async function request<T>(path: string, init: RequestInit, { auth = false }: Req
   try {
     response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
   } catch {
-    throw new ApiError(0, 'The CoursePilot server is unavailable.')
+    // fetch itself failed: no network, or nothing is answering at the API address.
+    throw new ApiError(0, "Can't reach the CoursePilot server. Check your connection and try again.")
   }
 
   if (!response.ok) {
@@ -64,9 +65,13 @@ function errorMessage(detail: unknown, status: number): string {
   if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') {
     return detail[0].msg.replace(/^Value error, /, '')
   }
+  if (status === 502 || status === 503 || status === 504) {
+    // A gateway answered because the backend itself didn't: it isn't running, is restarting, or is too slow.
+    // The Vite development proxy also answers 503 when the backend isn't running (see vite.config.ts).
+    return "Can't reach the CoursePilot server right now. Please try again in a moment."
+  }
   if (status >= 500) {
-    // Includes the development proxy's response when the backend isn't running.
-    return "The CoursePilot server couldn't complete the request. Please try again."
+    return 'Something went wrong on the CoursePilot server. Please try again.'
   }
   return `Request failed with status ${status}.`
 }

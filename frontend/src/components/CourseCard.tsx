@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getCourseSections } from '../services/courses.ts'
+import { buttonClass, cardClass } from '../styles.ts'
 import type { Course, Section } from '../types/course.ts'
 import SectionCard from './SectionCard.tsx'
 
@@ -35,10 +36,15 @@ export default function CourseCard({ course, isSelected, onAdd, onRemove }: Cour
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article className={`${cardClass} p-4 ${isSelected ? 'ring-1 ring-blue-700/30' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-semibold text-slate-900">{course.course_code}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold text-slate-900">{course.course_code}</h2>
+            {isSelected && (
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">Selected</span>
+            )}
+          </div>
           <p className="text-slate-800">{course.course_name}</p>
           <p className="mt-1 text-sm text-slate-500">
             {course.department} · {course.credit_hours} {course.credit_hours === 1 ? 'credit' : 'credits'}
@@ -51,24 +57,16 @@ export default function CourseCard({ course, isSelected, onAdd, onRemove }: Cour
             onClick={toggleSections}
             aria-expanded={showSections}
             aria-controls={sectionsId}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className={buttonClass('secondary', 'sm')}
           >
             {showSections ? 'Hide Sections' : 'View Sections'}
           </button>
           {isSelected ? (
-            <button
-              type="button"
-              onClick={() => onRemove(course.id)}
-              className="rounded-md border border-blue-700 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-100"
-            >
+            <button type="button" onClick={() => onRemove(course.id)} className={buttonClass('selected', 'sm')}>
               Remove
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => onAdd(course)}
-              className="rounded-md border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
-            >
+            <button type="button" onClick={() => onAdd(course)} className={buttonClass('primary', 'sm')}>
               Add
             </button>
           )}
@@ -82,7 +80,7 @@ export default function CourseCard({ course, isSelected, onAdd, onRemove }: Cour
           {sections.kind === 'loading' && <p className="text-sm text-slate-500">Loading sections…</p>}
           {sections.kind === 'error' && (
             <p role="alert" className="text-sm text-red-700">
-              {sections.message}
+              {sections.message} Close and reopen the sections to try again.
             </p>
           )}
           {sections.kind === 'ready' && sections.sections.length === 0 && (

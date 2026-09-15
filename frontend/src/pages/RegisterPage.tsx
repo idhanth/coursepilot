@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../auth/AuthContext.ts'
-
-const inputClass =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 focus:outline-none'
+import Page from '../components/Page.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { buttonClass, cardClass, inputClass, labelClass, textLinkClass } from '../styles.ts'
 
 export default function RegisterPage() {
+  useDocumentTitle('Create an account')
   const { user, register } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -59,14 +60,20 @@ export default function RegisterPage() {
   ]
 
   return (
-    <main className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-2xl font-semibold text-slate-900">Create an account</h1>
+    <Page narrow>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Create an account</h1>
       <p className="mt-1 text-sm text-slate-600">Save the schedules you build and come back to them later.</p>
 
-      <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      {from.startsWith('/results') && (
+        <p className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          Create an account to save your schedule. Your courses stay selected, and you’ll return to the same schedule.
+        </p>
+      )}
+
+      <form noValidate onSubmit={handleSubmit} className={`mt-6 space-y-4 p-5 ${cardClass}`}>
         {fields.map((field) => (
           <div key={field.id}>
-            <label htmlFor={field.id} className="block text-sm font-medium text-slate-800">
+            <label htmlFor={field.id} className={labelClass}>
               {field.label}
             </label>
             <input
@@ -75,7 +82,7 @@ export default function RegisterPage() {
               autoComplete={field.autoComplete}
               value={field.value}
               onChange={(event) => field.onChange(event.target.value)}
-              className={inputClass}
+              className={`mt-1 ${inputClass}`}
             />
           </div>
         ))}
@@ -86,21 +93,23 @@ export default function RegisterPage() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-60"
-        >
+        <button type="submit" disabled={submitting} className={`w-full ${buttonClass()}`}>
           {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
 
       <p className="mt-4 text-center text-sm text-slate-600">
         Already have an account?{' '}
-        <Link to="/login" state={location.state} className="font-medium text-blue-700 hover:text-blue-900">
+        <Link to="/login" state={location.state} className={textLinkClass}>
           Log in
         </Link>
       </p>
-    </main>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        Just browsing?{' '}
+        <Link to="/courses" className={textLinkClass}>
+          Search courses without an account
+        </Link>
+      </p>
+    </Page>
   )
 }

@@ -1,17 +1,6 @@
 import { DAY_NAMES, type GeneratedSchedule } from '../types/schedule.ts'
 import { blockPosition, calendarBlocks, calendarDays, calendarHours, formatTimeRange, hourLabel } from '../utils/calendar.ts'
-
-// One color per course. Full class names are written out so Tailwind includes them in the CSS.
-const COURSE_COLORS = [
-  'border-blue-300 bg-blue-50 text-blue-950',
-  'border-emerald-300 bg-emerald-50 text-emerald-950',
-  'border-amber-300 bg-amber-50 text-amber-950',
-  'border-violet-300 bg-violet-50 text-violet-950',
-  'border-rose-300 bg-rose-50 text-rose-950',
-  'border-cyan-300 bg-cyan-50 text-cyan-950',
-  'border-lime-300 bg-lime-50 text-lime-950',
-  'border-orange-300 bg-orange-50 text-orange-950',
-]
+import { courseColor } from '../utils/courseColors.ts'
 
 const HOUR_HEIGHT_REM = 4
 
@@ -75,7 +64,7 @@ export default function WeeklyCalendar({ schedule }: { schedule: GeneratedSchedu
                     key={block.key}
                     data-testid="calendar-block"
                     title={`${block.courseCode}-${block.sectionNumber} · ${DAY_NAMES[day]} ${timeRange} · ${block.location}`}
-                    className={`absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight ${COURSE_COLORS[block.colorIndex % COURSE_COLORS.length]}`}
+                    className={`absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight ${courseColor(block.colorIndex).block}`}
                     style={{ top: `${top}%`, height: `${height}%` }}
                   >
                     <p className="font-semibold">{block.courseCode}</p>

@@ -1,5 +1,22 @@
-import type { GeneratedSchedule } from '../types/schedule.ts'
+import type { GeneratedSchedule, ScheduleSection } from '../types/schedule.ts'
 import { formatTime } from './format.ts'
+
+/** Sort comparator: sections in course-code order, the same order the backend uses for saved schedules. */
+export function byCourseCode(a: ScheduleSection, b: ScheduleSection): number {
+  const codeA = a.course.course_code
+  const codeB = b.course.course_code
+  return codeA < codeB ? -1 : codeA > codeB ? 1 : 0
+}
+
+/**
+ * Each course's color number: its position when the schedule's sections are sorted by course code.
+ * Generated results list courses in the order they were selected and saved schedules in course-code
+ * order, so numbering by the sorted order gives a course the same color in both places.
+ */
+export function courseColorIndexes(schedule: GeneratedSchedule): Map<string, number> {
+  const sorted = [...schedule.sections].sort(byCourseCode)
+  return new Map(sorted.map((section, index) => [section.course.course_code, index]))
+}
 
 /** One class meeting drawn on the weekly calendar. */
 export type CalendarBlock = {
@@ -12,7 +29,7 @@ export type CalendarBlock = {
   endTime: string
   startMinutes: number // minutes after midnight
   endMinutes: number
-  colorIndex: number // the course's position in the schedule, so all of its meetings share a color
+  colorIndex: number // see courseColorIndexes: all of a course's meetings share one color
 }
 
 /** "10:20:00" -> 620 */
@@ -23,7 +40,8 @@ export function minutesSinceMidnight(value: string): number {
 
 /** One block per meeting record. A MWF section has three meetings, so it becomes three blocks. */
 export function calendarBlocks(schedule: GeneratedSchedule): CalendarBlock[] {
-  return schedule.sections.flatMap((section, sectionIndex) =>
+  const colorIndexes = courseColorIndexes(schedule)
+  return schedule.sections.flatMap((section) =>
     section.meetings.map((meeting) => ({
       key: `${section.id}-${meeting.day_of_week}-${meeting.start_time}`,
       dayOfWeek: meeting.day_of_week,
@@ -34,7 +52,7 @@ export function calendarBlocks(schedule: GeneratedSchedule): CalendarBlock[] {
       endTime: meeting.end_time,
       startMinutes: minutesSinceMidnight(meeting.start_time),
       endMinutes: minutesSinceMidnight(meeting.end_time),
-      colorIndex: sectionIndex,
+      colorIndex: colorIndexes.get(section.course.course_code) ?? 0,
     })),
   )
 }

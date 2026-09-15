@@ -75,6 +75,18 @@ describe('calendarBlocks', () => {
   })
 })
 
+describe('course colors', () => {
+  it('gives each course the same color whatever order its sections arrive in', () => {
+    // Results list sections in selection order; saved schedules list them by course code.
+    const colors = (schedule: GeneratedSchedule) =>
+      Object.fromEntries(calendarBlocks(schedule).map((block) => [block.courseCode, block.colorIndex]))
+    const reversed: GeneratedSchedule = { ...SCHEDULE, sections: [...SCHEDULE.sections].reverse() }
+
+    expect(colors(reversed)).toEqual(colors(SCHEDULE))
+    expect(colors(SCHEDULE)).toEqual({ 'CSCI 1302': 0, 'PHYS 1211': 1 })
+  })
+})
+
 describe('calendar layout', () => {
   it('always shows Monday to Friday and adds weekend days only when needed', () => {
     const weekdays = calendarBlocks(SCHEDULE)

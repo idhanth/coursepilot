@@ -1,11 +1,17 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import EmptyState from '../components/EmptyState.tsx'
+import ErrorMessage from '../components/ErrorMessage.tsx'
+import LoadingMessage from '../components/LoadingMessage.tsx'
+import Page from '../components/Page.tsx'
+import PageHeader from '../components/PageHeader.tsx'
 import SaveScheduleForm from '../components/SaveScheduleForm.tsx'
 import ScheduleCard from '../components/ScheduleCard.tsx'
 import ScheduleNavigator from '../components/ScheduleNavigator.tsx'
 import WeeklyCalendar from '../components/WeeklyCalendar.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
 import { generateSchedules } from '../services/schedules.ts'
+import { buttonClass, cardClass } from '../styles.ts'
 import type { Course } from '../types/course.ts'
 import type { GenerateSchedulesResponse, PreferenceForm } from '../types/schedule.ts'
 import { buildGenerateRequest, describePreferences, emptyResultReason } from '../utils/schedule.ts'
@@ -20,13 +26,20 @@ type GenerationResult =
   | { attempt: number; kind: 'ready'; response: GenerateSchedulesResponse }
   | { attempt: number; kind: 'error'; message: string }
 
-const linkButtonClass =
-  'rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
-
 export default function ResultsPage({ selectedCourses, preferences }: ResultsPageProps) {
+  useDocumentTitle('Schedule Results')
   const [attempt, setAttempt] = useState(0) // goes up when the student clicks "Try again"
   const [result, setResult] = useState<GenerationResult | null>(null)
-  const [position, setPosition] = useState(0) // which schedule is shown, starting at 0
+
+  // The schedule being shown is kept in the address (?schedule=3), so going to the login page to save it
+  // and coming back returns to the same schedule. People count from 1; the array index counts from 0.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requested = Number.parseInt(searchParams.get('schedule') ?? '1', 10)
+  const position = Number.isInteger(requested) && requested >= 1 ? requested - 1 : 0
+
+  function showSchedule(nextPosition: number) {
+    setSearchParams({ schedule: String(nextPosition + 1) }, { replace: true })
+  }
 
   // Ask the backend for schedules when the page opens, and again after "Try again".
   useEffect(() => {
@@ -37,9 +50,7 @@ export default function ResultsPage({ selectedCourses, preferences }: ResultsPag
 
     generateSchedules(buildGenerateRequest(selectedCourses, preferences))
       .then((response) => {
-        if (ignore) return
-        setResult({ attempt, kind: 'ready', response })
-        setPosition(0)
+        if (!ignore) setResult({ attempt, kind: 'ready', response })
       })
       .catch((error: Error) => {
         if (!ignore) setResult({ attempt, kind: 'error', message: error.message })
@@ -53,9 +64,16 @@ export default function ResultsPage({ selectedCourses, preferences }: ResultsPag
   if (selectedCourses.length === 0) {
     return (
       <Page>
-        <EmptyState title="No courses selected" message="Search for the courses you want to take and add them first.">
-          <Link to="/courses" className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">
+        <PageHeader title="Schedule Results" />
+        <EmptyState
+          title="No courses selected"
+          message="Generated schedules are kept only until you refresh or leave the page. Search for courses to generate them again, or open a schedule you saved."
+        >
+          <Link to="/courses" className={buttonClass()}>
             Search courses
+          </Link>
+          <Link to="/dashboard" className={buttonClass('secondary')}>
+            View saved schedules
           </Link>
         </EmptyState>
       </Page>
@@ -68,63 +86,46 @@ export default function ResultsPage({ selectedCourses, preferences }: ResultsPag
 
   return (
     <Page>
-      <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
-        <div className="text-sm text-slate-600">
-          <p>{selectedCourses.map((course) => course.course_code).join(', ')}</p>
-          <p>Preferences: {preferenceDescriptions.length > 0 ? preferenceDescriptions.join(' · ') : 'none'}</p>
-        </div>
-        <Link to="/planner" className={linkButtonClass}>
-          Edit courses or preferences
-        </Link>
-      </div>
+      <PageHeader
+        title="Schedule Results"
+        description={
+          <>
+            <p>{selectedCourses.map((course) => course.course_code).join(', ')}</p>
+            <p>Preferences: {preferenceDescriptions.length > 0 ? preferenceDescriptions.join(' · ') : 'none'}</p>
+          </>
+        }
+        actions={
+          <Link to="/planner" className={buttonClass('secondary', 'sm')}>
+            Edit courses or preferences
+          </Link>
+        }
+      />
 
-      {current === null && (
-        <p role="status" className="mt-8 text-sm text-slate-600">
-          Generating schedules…
-        </p>
-      )}
+      {current === null && <LoadingMessage>Generating schedules…</LoadingMessage>}
 
       {current?.kind === 'error' && (
-        <div role="alert" className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <p>{current.message}</p>
-          <button
-            type="button"
-            onClick={() => setAttempt((previous) => previous + 1)}
-            className="mt-2 font-medium text-red-900 underline hover:no-underline"
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorMessage message={current.message} onRetry={() => setAttempt((previous) => previous + 1)} />
       )}
 
       {current?.kind === 'ready' && (
-        <GeneratedResults response={current.response} position={position} onPositionChange={setPosition} />
+        <GeneratedResults response={current.response} position={position} onShowSchedule={showSchedule} />
       )}
     </Page>
-  )
-}
-
-function Page({ children }: { children: ReactNode }) {
-  return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-slate-900">Schedule Results</h1>
-      {children}
-    </main>
   )
 }
 
 type GeneratedResultsProps = {
   response: GenerateSchedulesResponse
   position: number
-  onPositionChange: (position: number) => void
+  onShowSchedule: (position: number) => void
 }
 
-function GeneratedResults({ response, position, onPositionChange }: GeneratedResultsProps) {
+function GeneratedResults({ response, position, onShowSchedule }: GeneratedResultsProps) {
   const reason = emptyResultReason(response)
 
   return (
     <>
-      <dl className="mt-6 grid grid-cols-3 divide-x divide-slate-200 rounded-lg border border-slate-200 bg-white text-center shadow-sm">
+      <dl className={`mt-6 grid grid-cols-3 divide-x divide-slate-200 text-center ${cardClass}`}>
         <Count label="Section combinations" value={response.total_combinations} />
         <Count label="Without time conflicts" value={response.conflict_free_count} />
         <Count label="Match your preferences" value={response.count} />
@@ -135,7 +136,7 @@ function GeneratedResults({ response, position, onPositionChange }: GeneratedRes
           title="These courses can't fit together"
           message={`Every one of the ${response.total_combinations} section combinations has a time conflict. Try removing a course or choosing a different one.`}
         >
-          <Link to="/planner" className={linkButtonClass}>
+          <Link to="/planner" className={buttonClass('secondary')}>
             Change courses
           </Link>
         </EmptyState>
@@ -146,38 +147,50 @@ function GeneratedResults({ response, position, onPositionChange }: GeneratedRes
           title="No schedules match your preferences"
           message={`${response.conflict_free_count} conflict-free ${response.conflict_free_count === 1 ? 'schedule exists' : 'schedules exist'}, but your preferences rule out all of them. Try loosening a preference.`}
         >
-          <Link to="/planner" className={linkButtonClass}>
+          <Link to="/planner" className={buttonClass('secondary')}>
             Edit preferences
           </Link>
         </EmptyState>
       )}
 
       {reason === null && (
-        <ShownSchedule response={response} position={Math.min(position, response.count - 1)} onPositionChange={onPositionChange} />
+        // A position from the address can be past the end (e.g. ?schedule=9 with 7 schedules), so clamp it.
+        <ShownSchedule response={response} position={Math.min(position, response.count - 1)} onShowSchedule={onShowSchedule} />
       )}
     </>
   )
 }
 
-function ShownSchedule({ response, position, onPositionChange }: GeneratedResultsProps) {
+function ShownSchedule({ response, position, onShowSchedule }: GeneratedResultsProps) {
   // Only the schedule at `position` is rendered, even when the backend returned hundreds.
   const schedule = response.schedules[position]
+  const scheduleLabel = `Schedule ${position + 1} of ${response.count}`
 
   return (
     <div className="mt-6">
       <ScheduleNavigator
         position={position}
         count={response.count}
-        onPrevious={() => onPositionChange(position - 1)}
-        onNext={() => onPositionChange(position + 1)}
+        onPrevious={() => onShowSchedule(position - 1)}
+        onNext={() => onShowSchedule(position + 1)}
       />
-      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <WeeklyCalendar schedule={schedule} />
-        {/* On small screens the text summary comes first; the calendar follows. */}
-        <div className="order-first space-y-4 lg:order-none">
+      {/* Phones: sections, calendar, save form (top to bottom).
+          Large screens: the calendar on the left, the sections and save form stacked on the right. */}
+      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:items-start">
+        <div className="lg:col-start-2 lg:row-start-1">
           <ScheduleCard schedule={schedule} />
+        </div>
+        <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <WeeklyCalendar schedule={schedule} />
+        </div>
+        <div className="lg:col-start-2 lg:row-start-2">
           {/* key={position} gives each schedule a fresh save form when the student moves to another one. */}
-          <SaveScheduleForm key={position} schedule={schedule} />
+          <SaveScheduleForm
+            key={position}
+            schedule={schedule}
+            returnTo={`/results?schedule=${position + 1}`}
+            scheduleLabel={scheduleLabel}
+          />
         </div>
       </div>
     </div>

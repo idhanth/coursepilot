@@ -5,6 +5,7 @@ import RequireAuth from './components/RequireAuth.tsx'
 import CourseSearchPage from './pages/CourseSearchPage.tsx'
 import DashboardPage from './pages/DashboardPage.tsx'
 import LoginPage from './pages/LoginPage.tsx'
+import NotFoundPage from './pages/NotFoundPage.tsx'
 import PlannerPage from './pages/PlannerPage.tsx'
 import RegisterPage from './pages/RegisterPage.tsx'
 import ResultsPage from './pages/ResultsPage.tsx'
@@ -82,6 +83,7 @@ export default function App() {
           }
         />
         <Route path="/status" element={<StatusPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
   )

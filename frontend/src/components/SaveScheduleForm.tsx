@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext.ts'
 import { saveSchedule } from '../services/savedSchedules.ts'
+import { buttonClass, cardClass, inputClass, labelClass, textLinkClass } from '../styles.ts'
 import type { SavedScheduleDetail } from '../types/savedSchedule.ts'
 import type { GeneratedSchedule } from '../types/schedule.ts'
 
@@ -10,11 +11,14 @@ type SaveState =
   | { kind: 'saving' }
   | { kind: 'saved'; saved: SavedScheduleDetail }
 
-const inputClass =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 focus:outline-none'
+type SaveScheduleFormProps = {
+  schedule: GeneratedSchedule
+  returnTo: string // where to come back to after logging in, e.g. "/results?schedule=3"
+  scheduleLabel: string // e.g. "Schedule 3 of 7"
+}
 
 /** Saves the schedule currently shown on the results page. */
-export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSchedule }) {
+export default function SaveScheduleForm({ schedule, returnTo, scheduleLabel }: SaveScheduleFormProps) {
   const { user } = useAuth()
   const [name, setName] = useState('')
   const [semester, setSemester] = useState('')
@@ -22,15 +26,17 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
 
   if (user === null) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className={`${cardClass} p-4`}>
         <h2 className="font-semibold text-slate-900">Save this schedule</h2>
-        <p className="mt-1 text-sm text-slate-600">Log in to save schedules to your dashboard.</p>
-        <div className="mt-3 flex flex-wrap gap-3 text-sm font-medium">
-          {/* state.from brings the student back here; the generated results are still in memory. */}
-          <Link to="/login" state={{ from: '/results' }} className="rounded-md bg-blue-700 px-3 py-1.5 text-white hover:bg-blue-800">
+        <p className="mt-1 text-sm text-slate-600">
+          Log in to save {scheduleLabel.toLowerCase()} to your dashboard. Your courses stay selected, and you’ll come
+          right back to this schedule.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <Link to="/login" state={{ from: returnTo }} className={buttonClass('primary', 'sm')}>
             Log in
           </Link>
-          <Link to="/register" state={{ from: '/results' }} className="px-1 py-1.5 text-blue-700 hover:text-blue-900">
+          <Link to="/register" state={{ from: returnTo }} className={textLinkClass}>
             Create an account
           </Link>
         </div>
@@ -43,10 +49,10 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
       <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
         <p className="font-medium">Saved “{state.saved.name}”.</p>
         <div className="mt-2 flex flex-wrap gap-4 font-medium">
-          <Link to={`/saved/${state.saved.id}`} className="text-emerald-900 underline hover:no-underline">
+          <Link to={`/saved/${state.saved.id}`} className="rounded text-emerald-900 underline hover:no-underline">
             Open saved schedule
           </Link>
-          <Link to="/dashboard" className="text-emerald-900 underline hover:no-underline">
+          <Link to="/dashboard" className="rounded text-emerald-900 underline hover:no-underline">
             Go to dashboard
           </Link>
         </div>
@@ -75,11 +81,12 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
   }
 
   return (
-    <form noValidate onSubmit={handleSubmit} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <form noValidate onSubmit={handleSubmit} className={`${cardClass} p-4`}>
       <h2 className="font-semibold text-slate-900">Save this schedule</h2>
+      <p className="mt-1 text-xs text-slate-500">Generated schedules disappear if you refresh or close the page until you save one.</p>
       <div className="mt-3 space-y-3">
         <div>
-          <label htmlFor="save-name" className="block text-sm font-medium text-slate-800">
+          <label htmlFor="save-name" className={labelClass}>
             Name
           </label>
           <input
@@ -88,11 +95,11 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
             maxLength={100}
             placeholder="Fall 2027 - Friday Off"
             onChange={(event) => setName(event.target.value)}
-            className={inputClass}
+            className={`mt-1 ${inputClass}`}
           />
         </div>
         <div>
-          <label htmlFor="save-semester" className="block text-sm font-medium text-slate-800">
+          <label htmlFor="save-semester" className={labelClass}>
             Semester
           </label>
           <input
@@ -101,7 +108,7 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
             maxLength={20}
             placeholder="Fall 2027"
             onChange={(event) => setSemester(event.target.value)}
-            className={inputClass}
+            className={`mt-1 ${inputClass}`}
           />
         </div>
       </div>
@@ -112,11 +119,7 @@ export default function SaveScheduleForm({ schedule }: { schedule: GeneratedSche
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={state.kind === 'saving'}
-        className="mt-4 w-full rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-60"
-      >
+      <button type="submit" disabled={state.kind === 'saving'} className={`mt-4 w-full ${buttonClass()}`}>
         {state.kind === 'saving' ? 'Saving…' : 'Save Schedule'}
       </button>
     </form>

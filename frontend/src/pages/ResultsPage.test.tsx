@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthContextValue } from '../auth/AuthContext.ts'
 import { ApiError } from '../services/api.ts'
@@ -89,6 +89,11 @@ function renderResults(
   )
 }
 
+function LoginMarker() {
+  const location = useLocation()
+  return <p>Login page, returning to {(location.state as { from?: string } | null)?.from}</p>
+}
+
 function counts() {
   return screen.getAllByRole('definition').map((element) => element.textContent)
 }
@@ -168,6 +173,9 @@ describe('ResultsPage', () => {
     renderResults([])
 
     expect(screen.getByRole('heading', { name: 'No courses selected' })).toBeDefined()
+    // Explains why results can vanish: they are only kept until a refresh.
+    expect(screen.getByText(/kept only until you refresh or leave the page/)).toBeDefined()
+    expect(screen.getByRole('link', { name: 'View saved schedules' }).getAttribute('href')).toBe('/dashboard')
     expect(mockGenerateSchedules).not.toHaveBeenCalled()
   })
 
@@ -227,6 +235,33 @@ describe('ResultsPage', () => {
     expect(screen.getAllByTestId('calendar-block')).toHaveLength(5)
   })
 
+  it('keeps the shown schedule in the address, so logging in to save returns to the same schedule', async () => {
+    mockGenerateSchedules.mockResolvedValue(
+      backendResponse({ total: 81, conflictFree: 63 }, [schedule('001'), schedule('002'), schedule('003')]),
+    )
+    render(
+      withAuth(
+        <MemoryRouter initialEntries={['/results?schedule=2']}>
+          <Routes>
+            <Route path="/results" element={<ResultsPage selectedCourses={COURSES} preferences={EMPTY_PREFERENCES} />} />
+            <Route path="/login" element={<LoginMarker />} />
+          </Routes>
+        </MemoryRouter>,
+        { user: null },
+      ),
+    )
+
+    // Opening /results?schedule=2 (what login returns to) shows schedule 2, not schedule 1.
+    expect(await screen.findByText('Schedule 2 of 3')).toBeDefined()
+    expect(screen.getByText('CSCI 1302-002')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText(/Log in to save schedule 3 of 3 to your dashboard/)).toBeDefined()
+    fireEvent.click(screen.getByRole('link', { name: 'Log in' }))
+
+    expect(screen.getByText('Login page, returning to /results?schedule=3')).toBeDefined()
+  })
+
   it('disables both buttons when there is exactly one schedule', async () => {
     mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 1 }, [schedule('001')]))
     renderResults()
@@ -265,9 +300,9 @@ describe('ResultsPage', () => {
     renderResults()
 
     const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toContain('The CoursePilot server is unavailable.')
+    expect(alert.textContent).toBe('The CoursePilot server is unavailable.')
 
-    fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
     expect(await screen.findByText('Schedule 1 of 1')).toBeDefined()
     expect(mockGenerateSchedules).toHaveBeenCalledTimes(2)

@@ -57,6 +57,7 @@ describe('PlannerPage', () => {
     renderPlanner([])
 
     expect(screen.getByRole('heading', { name: 'No courses selected' })).toBeDefined()
+    expect(screen.getByText(/a refresh starts over/)).toBeDefined()
     expect(screen.getByRole('link', { name: 'Search courses' }).getAttribute('href')).toBe('/courses')
   })
 

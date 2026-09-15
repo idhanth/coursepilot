@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import EmptyState from '../components/EmptyState.tsx'
+import Page from '../components/Page.tsx'
+import PageHeader from '../components/PageHeader.tsx'
 import PreferencesForm from '../components/PreferencesForm.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { buttonClass, cardClass, textLinkClass } from '../styles.ts'
 import type { Course } from '../types/course.ts'
 import type { PreferenceForm } from '../types/schedule.ts'
 import { validateScheduleRequest } from '../utils/schedule.ts'
@@ -14,6 +18,7 @@ type PlannerPageProps = {
 }
 
 export default function PlannerPage({ selectedCourses, onRemoveCourse, preferences, onPreferencesChange }: PlannerPageProps) {
+  useDocumentTitle('Schedule Builder')
   const navigate = useNavigate()
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -34,29 +39,32 @@ export default function PlannerPage({ selectedCourses, onRemoveCourse, preferenc
 
   if (selectedCourses.length === 0) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-semibold text-slate-900">Schedule Builder</h1>
-        <EmptyState title="No courses selected" message="Search for the courses you want to take and add them first.">
-          <Link to="/courses" className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">
+      <Page>
+        <PageHeader title="Schedule Builder" />
+        <EmptyState
+          title="No courses selected"
+          message="Your course selection is kept only while this page is open, so a refresh starts over. Search for the courses you want to take and add them first."
+        >
+          <Link to="/courses" className={buttonClass()}>
             Search courses
           </Link>
         </EmptyState>
-      </main>
+      </Page>
     )
   }
 
   const totalCredits = selectedCourses.reduce((sum, course) => sum + course.credit_hours, 0)
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-slate-900">Schedule Builder</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Review your courses, set any preferences, then generate every schedule that fits.
-      </p>
+    <Page>
+      <PageHeader
+        title="Schedule Builder"
+        description="Review your courses, set any preferences, then generate every schedule that fits."
+      />
 
       {/* grid-cols-1 lets the column shrink on phones instead of stretching to fit long course names. */}
       <form noValidate onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-        <section aria-labelledby="planner-courses-heading" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section aria-labelledby="planner-courses-heading" className={`${cardClass} p-4`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="planner-courses-heading" className="font-semibold text-slate-900">
               Selected Courses
@@ -79,7 +87,7 @@ export default function PlannerPage({ selectedCourses, onRemoveCourse, preferenc
                   type="button"
                   onClick={() => onRemoveCourse(course.id)}
                   aria-label={`Remove ${course.course_code}`}
-                  className="shrink-0 text-sm font-medium text-red-700 hover:text-red-900"
+                  className="shrink-0 rounded text-sm font-medium text-red-700 hover:text-red-900"
                 >
                   Remove
                 </button>
@@ -87,12 +95,12 @@ export default function PlannerPage({ selectedCourses, onRemoveCourse, preferenc
             ))}
           </ul>
 
-          <Link to="/courses" className="mt-3 inline-block text-sm font-medium text-blue-700 hover:text-blue-900">
+          <Link to="/courses" className={`mt-3 inline-block text-sm ${textLinkClass}`}>
             Add more courses
           </Link>
         </section>
 
-        <section aria-labelledby="preferences-heading" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section aria-labelledby="preferences-heading" className={`${cardClass} p-4`}>
           <h2 id="preferences-heading" className="font-semibold text-slate-900">
             Preferences
           </h2>
@@ -100,17 +108,17 @@ export default function PlannerPage({ selectedCourses, onRemoveCourse, preferenc
           <PreferencesForm value={preferences} onChange={handlePreferencesChange} />
         </section>
 
-        <div className="flex flex-wrap items-center justify-end gap-3 lg:col-span-2">
+        <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end lg:col-span-2">
           {formError && (
             <p role="alert" className="text-sm text-red-700">
               {formError}
             </p>
           )}
-          <button type="submit" className="rounded-md bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800">
+          <button type="submit" className={`w-full sm:w-auto ${buttonClass()}`}>
             Generate Schedules
           </button>
         </div>
       </form>
-    </main>
+    </Page>
   )
 }

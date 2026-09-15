@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { buttonClass, cardClass } from '../styles.ts'
 import type { Course } from '../types/course.ts'
 
 type SelectedCoursesPanelProps = {
@@ -8,18 +9,17 @@ type SelectedCoursesPanelProps = {
 }
 
 export default function SelectedCoursesPanel({ courses, onRemove, onClear }: SelectedCoursesPanelProps) {
+  const totalCredits = courses.reduce((sum, course) => sum + course.credit_hours, 0)
+
   return (
     // order-first puts this panel above the results on small screens; on large screens it sits on the right.
-    <aside
-      aria-labelledby="selected-courses-heading"
-      className="order-first rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:order-none"
-    >
+    <aside aria-labelledby="selected-courses-heading" className={`order-first p-4 lg:sticky lg:top-6 lg:order-none ${cardClass}`}>
       <div className="flex items-center justify-between gap-2">
         <h2 id="selected-courses-heading" className="font-semibold text-slate-900">
           Selected Courses <span className="font-normal text-slate-500">({courses.length})</span>
         </h2>
         {courses.length > 0 && (
-          <button type="button" onClick={onClear} className="text-sm font-medium text-slate-500 hover:text-slate-900">
+          <button type="button" onClick={onClear} className="rounded text-sm font-medium text-slate-500 hover:text-slate-900">
             Clear
           </button>
         )}
@@ -42,17 +42,15 @@ export default function SelectedCoursesPanel({ courses, onRemove, onClear }: Sel
                   type="button"
                   onClick={() => onRemove(course.id)}
                   aria-label={`Remove ${course.course_code}`}
-                  className="shrink-0 text-sm font-medium text-red-700 hover:text-red-900"
+                  className="shrink-0 rounded text-sm font-medium text-red-700 hover:text-red-900"
                 >
                   Remove
                 </button>
               </li>
             ))}
           </ul>
-          <Link
-            to="/planner"
-            className="mt-3 block rounded-md bg-blue-700 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-800"
-          >
+          <p className="mt-2 text-sm text-slate-600">{totalCredits} credits in total</p>
+          <Link to="/planner" className={`mt-3 w-full ${buttonClass()}`}>
             Build Schedule
           </Link>
         </>

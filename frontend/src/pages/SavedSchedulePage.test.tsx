@@ -95,11 +95,16 @@ describe('SavedSchedulePage', () => {
   })
 
   it('shows a server error as an error, not as "not found"', async () => {
-    mockGet.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+    mockGet.mockRejectedValueOnce(new ApiError(0, 'The CoursePilot server is unavailable.')).mockResolvedValueOnce(SAVED)
     renderSaved('7')
 
     expect((await screen.findByRole('alert')).textContent).toBe('The CoursePilot server is unavailable.')
     expect(screen.queryByRole('heading', { name: 'Saved schedule not found' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByRole('heading', { name: 'Fall 2027 - Late Start' })).toBeDefined()
+    expect(mockGet).toHaveBeenCalledTimes(2)
   })
 
   it('shows "not found" for an id that is not a number without calling the backend', () => {

@@ -2,14 +2,23 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext.ts'
 import EmptyState from '../components/EmptyState.tsx'
+import ErrorMessage from '../components/ErrorMessage.tsx'
+import LoadingMessage from '../components/LoadingMessage.tsx'
+import Page from '../components/Page.tsx'
+import PageHeader from '../components/PageHeader.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
 import { deleteSavedSchedule, listSavedSchedules } from '../services/savedSchedules.ts'
+import { buttonClass, cardClass } from '../styles.ts'
 import type { SavedScheduleSummary } from '../types/savedSchedule.ts'
 import { formatDate } from '../utils/format.ts'
 
 export default function DashboardPage() {
+  useDocumentTitle('Dashboard')
   const { user, logout } = useAuth()
+  const [attempt, setAttempt] = useState(0) // goes up when the student clicks "Try again"
   const [schedules, setSchedules] = useState<SavedScheduleSummary[] | null>(null) // null until loaded
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -17,24 +26,29 @@ export default function DashboardPage() {
       .then((saved) => {
         if (!ignore) setSchedules(saved)
       })
-      .catch((loadError: Error) => {
-        if (!ignore) setError(loadError.message)
+      .catch((error: Error) => {
+        if (!ignore) setLoadError(error.message)
       })
     return () => {
       ignore = true
     }
-  }, [])
+  }, [attempt])
+
+  function retryLoading() {
+    setLoadError(null)
+    setAttempt((previous) => previous + 1)
+  }
 
   async function handleDelete(schedule: SavedScheduleSummary) {
     if (!window.confirm(`Delete “${schedule.name}”? This can't be undone.`)) {
       return
     }
-    setError(null)
+    setDeleteError(null)
     try {
       await deleteSavedSchedule(schedule.id)
       setSchedules((current) => (current ?? []).filter((saved) => saved.id !== schedule.id))
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete the schedule.')
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Could not delete the schedule.')
     }
   }
 
@@ -43,54 +57,44 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Welcome, {user.name}</h1>
-          <p className="mt-1 text-sm text-slate-600">{user.email}</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link to="/courses" className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">
-            Build New Schedule
-          </Link>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Log out
-          </button>
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        title={`Welcome, ${user.name}`}
+        description={user.email}
+        actions={
+          <>
+            <Link to="/courses" className={buttonClass()}>
+              Build New Schedule
+            </Link>
+            <button type="button" onClick={logout} className={buttonClass('secondary')}>
+              Log out
+            </button>
+          </>
+        }
+      />
 
-      <section aria-labelledby="saved-heading" className="mt-8">
+      <section aria-labelledby="saved-heading" className="mt-8 max-w-3xl">
         <h2 id="saved-heading" className="text-lg font-semibold text-slate-900">
           Saved Schedules
         </h2>
 
-        {error && (
-          <p role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {error}
-          </p>
-        )}
+        {deleteError && <ErrorMessage message={deleteError} />}
+        {loadError && <ErrorMessage message={loadError} onRetry={retryLoading} />}
 
-        {schedules === null && error === null && <p className="mt-3 text-sm text-slate-600">Loading saved schedules…</p>}
+        {schedules === null && loadError === null && <LoadingMessage>Loading saved schedules…</LoadingMessage>}
 
         {schedules !== null && schedules.length === 0 && (
           <EmptyState title="No saved schedules yet" message="Generate schedules for your courses and save the ones you like.">
-            <Link to="/courses" className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800">
+            <Link to="/courses" className={buttonClass()}>
               Build New Schedule
             </Link>
           </EmptyState>
         )}
 
         {schedules !== null && schedules.length > 0 && (
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-4 space-y-3">
             {schedules.map((schedule) => (
-              <li
-                key={schedule.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-              >
+              <li key={schedule.id} className={`flex flex-wrap items-center justify-between gap-3 p-4 ${cardClass}`}>
                 <div className="min-w-0">
                   <p className="font-medium text-slate-900">{schedule.name}</p>
                   <p className="text-sm text-slate-600">
@@ -102,7 +106,7 @@ export default function DashboardPage() {
                   <Link
                     to={`/saved/${schedule.id}`}
                     aria-label={`Open ${schedule.name}`}
-                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className={buttonClass('secondary', 'sm')}
                   >
                     Open
                   </Link>
@@ -110,7 +114,7 @@ export default function DashboardPage() {
                     type="button"
                     onClick={() => handleDelete(schedule)}
                     aria-label={`Delete ${schedule.name}`}
-                    className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                    className={buttonClass('danger', 'sm')}
                   >
                     Delete
                   </button>
@@ -120,6 +124,6 @@ export default function DashboardPage() {
           </ul>
         )}
       </section>
-    </main>
+    </Page>
   )
 }

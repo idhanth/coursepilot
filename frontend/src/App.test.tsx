@@ -13,6 +13,19 @@ const CSCI: Course = { id: 2, course_code: 'CSCI 1302', course_name: 'Software D
 const ENGL: Course = { id: 8, course_code: 'ENGL 1102', course_name: 'English Composition II', department: 'English', description: null, credit_hours: 3 }
 
 describe('App', () => {
+  it('shows "Page not found" for an unknown address instead of a blank page', () => {
+    render(
+      <MemoryRouter initialEntries={['/no-such-page']}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Search courses' }).getAttribute('href')).toBe('/courses')
+  })
+
   it('carries the courses selected on the search page into the schedule builder and back', async () => {
     vi.mocked(listCourses).mockResolvedValue([CSCI, ENGL])
     render(

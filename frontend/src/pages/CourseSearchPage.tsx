@@ -1,11 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import CourseCard from '../components/CourseCard.tsx'
+import EmptyState from '../components/EmptyState.tsx'
+import ErrorMessage from '../components/ErrorMessage.tsx'
+import LoadingMessage from '../components/LoadingMessage.tsx'
+import Page from '../components/Page.tsx'
+import PageHeader from '../components/PageHeader.tsx'
 import SelectedCoursesPanel from '../components/SelectedCoursesPanel.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
 import { listCourses, searchCourses } from '../services/courses.ts'
+import { buttonClass, inputClass } from '../styles.ts'
 import type { Course } from '../types/course.ts'
 
-// A finished search, remembering which query it was for.
-type SearchResult = { query: string; kind: 'ready'; courses: Course[] } | { query: string; kind: 'error'; message: string }
+// A finished request, remembering which attempt it belongs to.
+type SearchResult = { attempt: number; kind: 'ready'; courses: Course[] } | { attempt: number; kind: 'error'; message: string }
 
 type CourseSearchPageProps = {
   // The selection is owned by App, so it is still there on the schedule builder and results pages.
@@ -21,50 +28,53 @@ export default function CourseSearchPage({
   onRemoveCourse,
   onClearCourses,
 }: CourseSearchPageProps) {
+  useDocumentTitle('Search Courses')
   const [input, setInput] = useState('') // what is typed in the search box
   const [submittedQuery, setSubmittedQuery] = useState('') // the last search submitted; '' means all courses
+  const [attempt, setAttempt] = useState(0) // goes up on every search and "Try again", so each one reloads
   const [result, setResult] = useState<SearchResult | null>(null)
 
-  // Runs when the page first loads and again whenever a new search is submitted.
   useEffect(() => {
-    // If a newer search starts before this request finishes, its outdated response is ignored.
+    // If a newer request starts before this one finishes, this outdated response is ignored.
     let ignore = false
 
     const request = submittedQuery === '' ? listCourses() : searchCourses(submittedQuery)
     request
       .then((courses) => {
-        if (!ignore) setResult({ query: submittedQuery, kind: 'ready', courses })
+        if (!ignore) setResult({ attempt, kind: 'ready', courses })
       })
       .catch((error: Error) => {
-        if (!ignore) setResult({ query: submittedQuery, kind: 'error', message: error.message })
+        if (!ignore) setResult({ attempt, kind: 'error', message: error.message })
       })
 
     return () => {
       ignore = true
     }
-  }, [submittedQuery])
+  }, [submittedQuery, attempt])
 
-  // Until a result for the current query arrives, the page shows "Loading".
-  const current = result !== null && result.query === submittedQuery ? result : null
+  // Until the result for the current attempt arrives, the page shows "Loading".
+  const current = result !== null && result.attempt === attempt ? result : null
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault() // stop the browser from reloading the page
     setSubmittedQuery(input.trim())
+    setAttempt((previous) => previous + 1)
   }
 
   function showAllCourses() {
     setInput('')
     setSubmittedQuery('')
+    setAttempt((previous) => previous + 1)
   }
 
   const selectedIds = new Set(selectedCourses.map((course) => course.id))
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-slate-900">Search Courses</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Search by course code, course name, or department, then add the courses you want to take.
-      </p>
+    <Page>
+      <PageHeader
+        title="Search Courses"
+        description="Search by course code, course name, or department, then add the courses you want to take."
+      />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <section aria-label="Course results">
@@ -79,22 +89,17 @@ export default function CourseSearchPage({
               onChange={(event) => setInput(event.target.value)}
               placeholder="e.g. CSCI, Software Development, Mathematics"
               maxLength={100}
-              className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 focus:outline-none"
+              className={`min-w-0 flex-1 ${inputClass}`}
             />
-            <button
-              type="submit"
-              className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
-            >
+            <button type="submit" className={buttonClass()}>
               Search
             </button>
           </form>
 
-          {current === null && <p className="mt-6 text-sm text-slate-500">Loading courses…</p>}
+          {current === null && <LoadingMessage>Loading courses…</LoadingMessage>}
 
           {current?.kind === 'error' && (
-            <p role="alert" className="mt-6 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              {current.message}
-            </p>
+            <ErrorMessage message={current.message} onRetry={() => setAttempt((previous) => previous + 1)} />
           )}
 
           {current?.kind === 'ready' && (
@@ -105,7 +110,7 @@ export default function CourseSearchPage({
                   <button
                     type="button"
                     onClick={showAllCourses}
-                    className="text-sm font-medium text-blue-700 hover:text-blue-900"
+                    className="rounded text-sm font-medium text-blue-700 hover:text-blue-900"
                   >
                     Show all courses
                   </button>
@@ -113,11 +118,14 @@ export default function CourseSearchPage({
               </div>
 
               {current.courses.length === 0 ? (
-                <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-600">
-                  {submittedQuery === ''
-                    ? 'No courses are available yet.'
-                    : 'Try a course code such as CSCI, a course name, or a department.'}
-                </p>
+                submittedQuery === '' ? (
+                  <EmptyState title="No courses yet" message="The course catalog is empty. Load the sample courses to get started." />
+                ) : (
+                  <EmptyState
+                    title="No matching courses"
+                    message="Try a course code such as CSCI, a course name, or a department."
+                  />
+                )
               ) : (
                 <ul className="mt-3 space-y-3">
                   {current.courses.map((course) => (
@@ -138,7 +146,7 @@ export default function CourseSearchPage({
 
         <SelectedCoursesPanel courses={selectedCourses} onRemove={onRemoveCourse} onClear={onClearCourses} />
       </div>
-    </main>
+    </Page>
   )
 }
 

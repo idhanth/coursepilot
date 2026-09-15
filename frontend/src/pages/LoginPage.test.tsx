@@ -74,7 +74,8 @@ describe('LoginPage', () => {
   it('returns to the page that sent the user to log in', async () => {
     mockLoginUser.mockResolvedValue({ access_token: 'jwt-from-backend', token_type: 'bearer' })
     mockGetCurrentUser.mockResolvedValue(TEST_USER)
-    renderLogin({ pathname: '/login', state: { from: '/results' } })
+    renderLogin({ pathname: '/login', state: { from: '/results?schedule=3' } })
+    expect(screen.getByText(/you’ll return to the same schedule/)).toBeDefined()
 
     fillAndSubmit('student@uga.edu', 'correct-horse-battery')
 
