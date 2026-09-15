@@ -28,3 +28,17 @@ def test_cors_allows_frontend_origin(client):
     )
 
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_cors_preflight_allows_authenticated_requests_only_from_the_frontend(client):
+    # A deployed frontend on another domain sends this preflight before DELETE /api/schedules/saved/{id}.
+    preflight = {"Access-Control-Request-Method": "DELETE", "Access-Control-Request-Headers": "authorization,content-type"}
+
+    allowed = client.options("/api/schedules/saved/1", headers={"Origin": "http://localhost:5173", **preflight})
+    other = client.options("/api/schedules/saved/1", headers={"Origin": "https://example.com", **preflight})
+
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "authorization" in allowed.headers["access-control-allow-headers"].lower()
+    assert "DELETE" in allowed.headers["access-control-allow-methods"]
+    assert "access-control-allow-origin" not in other.headers

@@ -85,6 +85,7 @@ def test_duplicate_registration_is_rejected(client, db):
         ("password", ""),
         ("password", None),
         ("password", "x" * 73),  # longer than bcrypt's 72-byte limit
+        ("name", "Al\x00ice"),  # regression: PostgreSQL can't store \x00, which used to cause a 500
     ],
 )
 def test_register_validates_input(client, field, value):
@@ -193,6 +194,10 @@ INVALID_TOKENS = {
     "missing_expiry": lambda user_id: jwt.encode({"sub": str(user_id)}, settings.jwt_secret, algorithm="HS256"),
     "non_numeric_subject": lambda user_id: jwt.encode(
         {"sub": "abc", "exp": expires_in(5)}, settings.jwt_secret, algorithm="HS256"
+    ),
+    # Regression: a correctly signed token whose id is too big for PostgreSQL's INTEGER used to cause a 500.
+    "subject_beyond_database_id_range": lambda user_id: jwt.encode(
+        {"sub": "99999999999", "exp": expires_in(5)}, settings.jwt_secret, algorithm="HS256"
     ),
     "tampered_payload": lambda user_id: tamper(
         jwt.encode({"sub": str(user_id), "exp": expires_in(5)}, settings.jwt_secret, algorithm="HS256")

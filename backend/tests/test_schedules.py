@@ -143,7 +143,8 @@ def test_course_without_sections_is_rejected(client, db):
     assert response.json() == {"detail": "No sections are offered for TEST 3000, so no schedule can include it."}
 
 
-@pytest.mark.parametrize("course_ids", [[0], [-1], [2_147_483_648], ["abc"]])
+# [True] and ["3"] are regressions: Pydantic used to turn them into the course ids 1 and 3.
+@pytest.mark.parametrize("course_ids", [[0], [-1], [2_147_483_648], ["abc"], [True], ["3"]])
 def test_impossible_course_ids_are_rejected(client, db, course_ids):
     assert generate(client, course_ids).status_code == 422
 

@@ -126,7 +126,16 @@ def test_save_trims_name_and_semester(client, db, catalog, alice):
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("name", ""), ("name", "   "), ("name", "x" * 101), ("semester", ""), ("semester", "   "), ("semester", "x" * 21)],
+    [
+        ("name", ""),
+        ("name", "   "),
+        ("name", "x" * 101),
+        ("name", "Fall\x00Plan"),  # regression: \x00 can't be stored by PostgreSQL and used to cause a 500
+        ("semester", ""),
+        ("semester", "   "),
+        ("semester", "x" * 21),
+        ("semester", "Fall\x002027"),
+    ],
 )
 def test_save_requires_a_name_and_semester(client, db, catalog, alice, field, value):
     fields = {"name": "Fall 2027 - Late Start", "semester": "Fall 2027"} | {field: value}
@@ -135,6 +144,23 @@ def test_save_requires_a_name_and_semester(client, db, catalog, alice, field, va
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", field]
+    assert count(db, SavedSchedule) == 0
+
+
+@pytest.mark.parametrize(
+    "bad_ids",
+    [
+        pytest.param([0], id="zero"),
+        pytest.param([True], id="boolean"),  # regression: used to be saved as section id 1
+        pytest.param(["7"], id="string"),
+        pytest.param(list(range(1, 10)), id="more sections than courses allowed"),
+    ],
+)
+def test_save_rejects_malformed_section_ids(client, db, catalog, alice, bad_ids):
+    response = save(client, alice, bad_ids)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"][:2] == ["body", "section_ids"]
     assert count(db, SavedSchedule) == 0
 
 

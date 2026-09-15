@@ -51,9 +51,11 @@ def read_access_token(token: str) -> int | None:
         payload = jwt.decode(
             token, settings.jwt_secret, algorithms=[JWT_ALGORITHM], options={"require": ["sub", "exp"]}
         )
-        return int(payload["sub"])
+        user_id = int(payload["sub"])
     except (jwt.InvalidTokenError, ValueError):
         return None
+    # User ids are PostgreSQL INTEGER values; looking up a number outside that range would crash the query.
+    return user_id if 1 <= user_id <= 2_147_483_647 else None
 
 
 # --- Users -----------------------------------------------------------------------------------

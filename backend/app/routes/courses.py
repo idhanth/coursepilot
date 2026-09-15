@@ -23,6 +23,11 @@ def search_courses(q: Annotated[str, Query(max_length=100)], db: Session = Depen
     query = q.strip()
     if not query:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Search query cannot be blank.")
+    # PostgreSQL can't compare text containing \x00; without this check the query fails with a 500.
+    if "\x00" in query:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Search query can't contain the NUL character."
+        )
     return course_service.search_courses(db, query)
 
 

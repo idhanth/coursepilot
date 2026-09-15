@@ -94,6 +94,14 @@ describe('SavedSchedulePage', () => {
     expect(await screen.findByRole('heading', { name: 'Saved schedule not found' })).toBeDefined()
   })
 
+  it('shows a server error as an error, not as "not found"', async () => {
+    mockGet.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+    renderSaved('7')
+
+    expect((await screen.findByRole('alert')).textContent).toBe('The CoursePilot server is unavailable.')
+    expect(screen.queryByRole('heading', { name: 'Saved schedule not found' })).toBeNull()
+  })
+
   it('shows "not found" for an id that is not a number without calling the backend', () => {
     renderSaved('abc')
 

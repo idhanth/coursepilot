@@ -3,6 +3,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 
+from app.schemas.validators import reject_nul_characters
+
 
 def check_password_length(password: str) -> str:
     # bcrypt can only hash the first 72 bytes of a password, and the bcrypt library
@@ -18,7 +20,9 @@ Password = Annotated[str, Field(min_length=1), AfterValidator(check_password_len
 
 
 class RegisterRequest(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100), AfterValidator(reject_nul_characters)
+    ]
     email: Email
     password: Password
 

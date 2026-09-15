@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../services/api.ts'
 import { deleteSavedSchedule, listSavedSchedules } from '../services/savedSchedules.ts'
 import { withAuth } from '../test/auth.ts'
 import type { SavedScheduleSummary } from '../types/savedSchedule.ts'
@@ -45,6 +46,15 @@ describe('DashboardPage', () => {
     expect(screen.getByText('CSCI 1302 · MATH 2250')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Open Fall 2027 - Late Start' }).getAttribute('href')).toBe('/saved/7')
     expect(screen.getByRole('link', { name: 'Build New Schedule' }).getAttribute('href')).toBe('/courses')
+  })
+
+  it('shows the error instead of an empty list when saved schedules cannot be loaded', async () => {
+    mockList.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+    renderDashboard()
+
+    expect((await screen.findByRole('alert')).textContent).toBe('The CoursePilot server is unavailable.')
+    expect(screen.queryByText('Loading saved schedules…')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'No saved schedules yet' })).toBeNull()
   })
 
   it('shows an empty state when nothing is saved', async () => {

@@ -81,6 +81,26 @@ describe('api', () => {
     expect(onUnauthorized).not.toHaveBeenCalled()
   })
 
+  it('reports a request that never reaches the server as the server being unavailable', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(apiGet('/api/courses')).rejects.toMatchObject({
+      status: 0,
+      message: 'The CoursePilot server is unavailable.',
+    })
+  })
+
+  it('turns FastAPI error bodies into messages a student can read', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(422, { detail: [{ loc: ['body', 'course_ids'], msg: 'Value error, Select at least one course.' }] }))
+      .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }))
+      .mockResolvedValueOnce(new Response(null, { status: 418 }))
+
+    await expect(apiPost('/api/schedules/generate', { course_ids: [] })).rejects.toThrow(/^Select at least one course\.$/)
+    await expect(apiGet('/api/courses')).rejects.toThrow("The CoursePilot server couldn't complete the request. Please try again.")
+    await expect(apiGet('/api/courses')).rejects.toThrow('Request failed with status 418.')
+  })
+
   it('resolves a 204 No Content response without reading a body', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 

@@ -127,6 +127,21 @@ describe('Saving the displayed schedule', () => {
     expect(screen.getByRole('link', { name: 'Open saved schedule' }).getAttribute('href')).toBe('/saved/42')
   })
 
+  it('shows why the backend refused to save and lets the user try again', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
+    mockSaveSchedule.mockRejectedValue(new ApiError(422, "These sections have a time conflict, so they can't be saved together."))
+    renderResults()
+    await screen.findByText('Schedule 1 of 1')
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Fall 2027 - Option 1' } })
+    fireEvent.change(screen.getByLabelText('Semester'), { target: { value: 'Fall 2027' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Schedule' })))
+
+    expect(screen.getByRole('alert').textContent).toBe("These sections have a time conflict, so they can't be saved together.")
+    expect((screen.getByRole('button', { name: 'Save Schedule' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe('Fall 2027 - Option 1')
+  })
+
   it('needs a name and a semester before saving', async () => {
     mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
     renderResults()

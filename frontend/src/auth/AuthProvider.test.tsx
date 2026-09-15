@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError } from '../services/api.ts'
+import { ApiError, apiGet } from '../services/api.ts'
 import { getCurrentUser, loginUser } from '../services/auth.ts'
 import { getToken, setToken } from '../services/token.ts'
 import { TEST_USER } from '../test/auth.ts'
@@ -64,6 +64,37 @@ describe('AuthProvider', () => {
     renderProvider()
 
     expect(await screen.findByText('user: nobody')).toBeDefined()
+    expect(getToken()).toBeNull()
+  })
+
+  it('keeps a saved token when the server cannot be reached during the check', async () => {
+    setToken('saved-token')
+    mockGetCurrentUser.mockRejectedValue(new ApiError(0, 'The CoursePilot server is unavailable.'))
+
+    renderProvider()
+
+    expect(await screen.findByText('user: nobody')).toBeDefined()
+    expect(getToken()).toBe('saved-token') // not proof the token is bad, so it is kept for the next visit
+  })
+
+  it('logs the user out when a later protected request is rejected with 401', async () => {
+    mockLoginUser.mockResolvedValue({ access_token: 'token-that-will-expire', token_type: 'bearer' })
+    mockGetCurrentUser.mockResolvedValue(TEST_USER)
+    renderProvider()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'log in' })))
+    expect(screen.getByText('user: Test Student')).toBeDefined()
+
+    // The real api.ts, with the backend answering 401 (for example, the JWT has expired).
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"detail":"Invalid or expired token."}', { status: 401 })))
+    try {
+      await act(async () => {
+        await apiGet('/api/schedules/saved', { auth: true }).catch(() => undefined)
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+
+    expect(screen.getByText('user: nobody')).toBeDefined()
     expect(getToken()).toBeNull()
   })
 

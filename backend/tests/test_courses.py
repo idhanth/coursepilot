@@ -165,6 +165,14 @@ def test_search_requires_a_query(client, catalog):
     assert response.json() == {"detail": "Search query cannot be blank."}
 
 
+def test_search_rejects_the_nul_character(client, catalog):
+    # Regression: PostgreSQL can't compare text containing \x00, so this used to fail with a 500.
+    response = search(client, "CS\x00CI")
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Search query can't contain the NUL character."}
+
+
 # --- GET /api/courses/{id} -----------------------------------------------------------------------
 
 

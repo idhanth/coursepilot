@@ -4,13 +4,15 @@ from typing import Annotated, Literal, get_args
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from app.schemas.course import SectionResponse
+from app.schemas.validators import reject_nul_characters
 
 # Generating schedules multiplies section counts, so the number of courses per request is capped:
 # 8 courses with 3 sections each is already 3^8 = 6,561 combinations to check.
 MAX_COURSES = 8
 
-# Ids are PostgreSQL INTEGER columns, which stop at 2,147,483,647.
-RecordId = Annotated[int, Field(ge=1, le=2_147_483_647)]
+# Ids are PostgreSQL INTEGER columns, which stop at 2,147,483,647. strict=True rejects true and "3",
+# which Pydantic would otherwise quietly turn into the ids 1 and 3.
+RecordId = Annotated[int, Field(strict=True, ge=1, le=2_147_483_647)]
 
 DayName = Literal["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 # "Monday" -> 0 ... "Sunday" -> 6, the same numbers stored in section_meetings.day_of_week.
@@ -94,8 +96,12 @@ class GenerateSchedulesResponse(BaseModel):
 class SaveScheduleRequest(BaseModel):
     """A generated schedule to keep: a name, a semester, and the ids of its sections."""
 
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-    semester: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100), AfterValidator(reject_nul_characters)
+    ]
+    semester: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20), AfterValidator(reject_nul_characters)
+    ]
     section_ids: list[RecordId] = Field(max_length=MAX_COURSES)
 
     @field_validator("section_ids")
