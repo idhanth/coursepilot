@@ -19,7 +19,7 @@ export default function StatusPage() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-16 text-slate-900">
+    <main className="px-4 py-16">
       <div className="mx-auto max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold">CoursePilot</h1>
         <p className="mt-1 text-sm text-slate-600">Semester schedule planner</p>

@@ -19,7 +19,10 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, `Request failed with status ${response.status}.`)
+    // FastAPI errors look like {"detail": "Course not found."}; show that message when there is one.
+    const body = (await response.json().catch(() => null)) as { detail?: unknown } | null
+    const message = typeof body?.detail === 'string' ? body.detail : `Request failed with status ${response.status}.`
+    throw new ApiError(response.status, message)
   }
   return response.json() as Promise<T>
 }

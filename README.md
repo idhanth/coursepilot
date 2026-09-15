@@ -7,7 +7,8 @@ your preferences, and shows the valid schedules on a weekly calendar.
 **Stack:** React · TypeScript · Vite · Tailwind CSS · FastAPI · SQLAlchemy · PostgreSQL
 
 > Status: early development — the frontend, backend and database are connected, the database
-> schema is in place, and the API supports registration, login and JWT authentication. Features are being built in the phases described in
+> schema is in place, the API supports registration, login and JWT authentication, and students can search the
+> course catalog and build a course selection. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -48,7 +49,7 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 cp .env.example .env                    # then set JWT_SECRET (see the comment in the file)
 .venv/bin/alembic upgrade head          # create or update the tables
-.venv/bin/python -m app.seed            # load sample courses (skipped if courses exist)
+.venv/bin/python -m app.seed            # load the sample catalog (adds only missing courses)
 .venv/bin/uvicorn app.main:app --reload --port 8020
 ```
 
@@ -63,8 +64,8 @@ npm run dev
 ```
 
 During development Vite forwards `/api` requests to the backend, so no extra configuration is
-needed. Open http://localhost:5173 — the status card should show the backend and database as
-connected.
+needed. Open http://localhost:5173 to search courses; http://localhost:5173/status shows whether
+the backend and database are connected.
 
 ## Database schema
 
@@ -110,6 +111,22 @@ TOKEN=$(curl -s -X POST localhost:8020/api/auth/login -H 'Content-Type: applicat
   -d '{"email": "student@uga.edu", "password": "correct-horse-battery"}' | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')
 curl localhost:8020/api/auth/me -H "Authorization: Bearer $TOKEN"
 ```
+
+## Courses
+
+| Endpoint                         | Description                                                    |
+| -------------------------------- | -------------------------------------------------------------- |
+| `GET /api/courses`               | All courses, sorted by course code                             |
+| `GET /api/courses/search?q=...`  | Courses whose code, name or department contains `q` (any case) |
+| `GET /api/courses/{id}`          | One course                                                     |
+| `GET /api/courses/{id}/sections` | A course's sections, each with its weekly meeting times        |
+| `GET /api/sections/{id}`         | One section with its meeting times                             |
+
+These endpoints are public. Missing courses and sections return 404. Meeting days are numbers
+(0 = Monday … 6 = Sunday) and times are `HH:MM:SS`.
+
+The sample catalog (`python -m app.seed`) has the 12 courses listed in PRD §33, each with
+3 sections: 36 sections and 94 weekly meeting times.
 
 ## Tests
 

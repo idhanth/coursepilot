@@ -3,11 +3,17 @@ from datetime import time
 from sqlalchemy import func, select
 
 from app.models import Course, Section, SectionMeeting
-from app.seed import COURSES, seed
+from app.seed import COURSES, build_course, seed
 
 
 def count(db, model) -> int:
     return db.scalar(select(func.count()).select_from(model))
+
+
+def test_seed_data_has_unique_course_codes():
+    codes = [course["course_code"] for course in COURSES]
+
+    assert len(codes) == len(set(codes))
 
 
 def test_seed_loads_every_course_section_and_meeting(db):
@@ -19,7 +25,7 @@ def test_seed_loads_every_course_section_and_meeting(db):
         for days, _start, _end in meetings
     )
 
-    assert seed(db) is True
+    assert seed(db) == len(COURSES)
 
     assert count(db, Course) == len(COURSES)
     assert count(db, Section) == expected_sections
@@ -41,11 +47,20 @@ def test_seed_stores_one_row_per_meeting_day(db):
     ]
 
 
-def test_seed_does_nothing_when_courses_already_exist(db):
+def test_seed_adds_only_missing_courses(db):
+    db.add(build_course(COURSES[0]))
+    db.commit()
+
+    assert seed(db) == len(COURSES) - 1
+
+    assert count(db, Course) == len(COURSES)
+
+
+def test_seed_does_nothing_when_every_course_exists(db):
     seed(db)
     meetings_before = count(db, SectionMeeting)
 
-    assert seed(db) is False
+    assert seed(db) == 0
 
     assert count(db, Course) == len(COURSES)
     assert count(db, SectionMeeting) == meetings_before
