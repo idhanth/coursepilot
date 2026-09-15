@@ -9,7 +9,7 @@ your preferences, and shows the valid schedules on a weekly calendar.
 > Status: early development — the frontend, backend and database are connected, the database
 > schema is in place, the API supports registration, login and JWT authentication, and students can search the
 > course catalog and build a course selection. The backend can detect time conflicts between
-> sections. Features are being built in the phases described in
+> sections and generate every conflict-free schedule for a set of courses. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -138,6 +138,33 @@ Conflict detection lives in [backend/app/services/schedule_service.py](backend/a
 - `meetings_conflict(a, b)` is true only when both meetings are on the same day and their times overlap.
 - `sections_conflict(a, b)` compares every meeting of one section with every meeting of the other
   (at most `meetings_a × meetings_b` checks) and stops at the first conflict.
+- `schedule_has_conflict(sections)` checks every unique pair of sections in one schedule:
+  `n × (n − 1) / 2` pairs, e.g. 6 for 4 courses.
+- `generate_combinations(course_sections)` uses `itertools.product` to pick one section from each
+  course in every possible way. The count is the product of the section counts (3 × 3 × 3 = 27).
+- `generate_valid_schedules(course_sections)` keeps the combinations with no conflicting pair.
+
+### `POST /api/schedules/generate`
+
+```json
+{ "course_ids": [1, 2, 4] }
+```
+
+The ids are course ids from `GET /api/courses`. The endpoint loads the courses with their sections and meetings (three queries), generates the combinations and
+returns the valid ones. With the sample catalog, CSCI 1302, MATH 2250 and ENGL 1102 give
+3 × 3 × 3 = 27 combinations, of which 24 are valid (CSCI 1302-001 and MATH 2250-002 both meet
+MWF 10:20):
+
+```json
+{
+  "total_combinations": 27,
+  "count": 24,
+  "schedules": [{ "sections": ["…one section per course, with its course and meetings…"], "total_credits": 11 }]
+}
+```
+
+`course_ids` must contain 1–8 different course ids. Unknown ids return 404, and a course with no
+sections returns 422. If every combination conflicts, `count` is 0.
 
 ## Tests
 

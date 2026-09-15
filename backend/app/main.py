@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import get_db
 from app.routes.auth import router as auth_router
 from app.routes.courses import router as courses_router
+from app.routes.schedules import router as schedules_router
 
 app = FastAPI(title="CoursePilot API")
 
@@ -21,6 +22,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(courses_router)
+app.include_router(schedules_router)
 
 
 @app.get("/api/health")

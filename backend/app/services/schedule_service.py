@@ -1,10 +1,12 @@
-"""Scheduling logic: deciding whether class meetings and sections conflict.
+"""Scheduling logic: deciding whether class meetings and sections conflict, and generating schedules.
 
 These functions only compare values; they never query the database. They work on
 SectionMeeting and Section objects, whether loaded from PostgreSQL or created in a test.
 """
 
+from collections.abc import Sequence
 from datetime import time
+from itertools import product
 
 from app.models import Section, SectionMeeting
 
@@ -37,3 +39,37 @@ def sections_conflict(section_a: Section, section_b: Section) -> bool:
             if meetings_conflict(meeting_a, meeting_b):
                 return True
     return False
+
+
+def schedule_has_conflict(sections: Sequence[Section]) -> bool:
+    """True if any two sections in one candidate schedule conflict.
+
+    Each unique pair is checked once: j always starts after i, so (A, B) is checked but (B, A)
+    and (A, A) are not. For n sections that is n x (n - 1) / 2 pairs, e.g. 4 x 3 / 2 = 6.
+    """
+    for i in range(len(sections)):
+        for j in range(i + 1, len(sections)):
+            if sections_conflict(sections[i], sections[j]):
+                return True
+    return False
+
+
+def generate_combinations(course_sections: Sequence[Sequence[Section]]) -> list[tuple[Section, ...]]:
+    """Every way to pick exactly one section from each course (the Cartesian product).
+
+    course_sections has one list of sections per selected course. With 3 courses of 3 sections
+    each there are 3 x 3 x 3 = 27 combinations, and each one is a tuple of 3 sections in course order.
+    """
+    # product() of zero lists yields a single empty tuple, which is not a real schedule.
+    if not course_sections:
+        return []
+    return list(product(*course_sections))
+
+
+def generate_valid_schedules(course_sections: Sequence[Sequence[Section]]) -> list[tuple[Section, ...]]:
+    """The combinations in which no two sections conflict."""
+    return [
+        combination
+        for combination in generate_combinations(course_sections)
+        if not schedule_has_conflict(combination)
+    ]
