@@ -1,7 +1,7 @@
-from datetime import time
+from datetime import datetime, time
 from typing import Annotated, Literal, get_args
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from app.schemas.course import SectionResponse
 
@@ -10,7 +10,7 @@ from app.schemas.course import SectionResponse
 MAX_COURSES = 8
 
 # Ids are PostgreSQL INTEGER columns, which stop at 2,147,483,647.
-CourseId = Annotated[int, Field(ge=1, le=2_147_483_647)]
+RecordId = Annotated[int, Field(ge=1, le=2_147_483_647)]
 
 DayName = Literal["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 # "Monday" -> 0 ... "Sunday" -> 6, the same numbers stored in section_meetings.day_of_week.
@@ -48,7 +48,7 @@ class SchedulePreferences(BaseModel):
 
 
 class GenerateSchedulesRequest(BaseModel):
-    course_ids: list[CourseId] = Field(max_length=MAX_COURSES)
+    course_ids: list[RecordId] = Field(max_length=MAX_COURSES)
     preferences: SchedulePreferences | None = None
 
     @field_validator("course_ids")
@@ -86,3 +86,40 @@ class GenerateSchedulesResponse(BaseModel):
     conflict_free_count: int  # combinations with no time conflicts, before preferences
     count: int  # schedules returned: conflict-free and matching every preference
     schedules: list[GeneratedSchedule]
+
+
+# --- Saved schedules -----------------------------------------------------------------------------
+
+
+class SaveScheduleRequest(BaseModel):
+    """A generated schedule to keep: a name, a semester, and the ids of its sections."""
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    semester: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
+    section_ids: list[RecordId] = Field(max_length=MAX_COURSES)
+
+    @field_validator("section_ids")
+    @classmethod
+    def check_section_ids(cls, section_ids: list[int]) -> list[int]:
+        if not section_ids:
+            raise ValueError("A schedule needs at least one section.")
+        if len(set(section_ids)) != len(section_ids):
+            raise ValueError("Each section can only be included once.")
+        return section_ids
+
+
+class SavedScheduleSummary(BaseModel):
+    """One saved schedule in the dashboard list."""
+
+    id: int
+    name: str
+    semester: str
+    created_at: datetime
+    course_codes: list[str]
+    total_credits: int
+
+
+class SavedScheduleDetail(SavedScheduleSummary):
+    """One saved schedule with its sections and meeting times, for the detail page."""
+
+    sections: list[ScheduleSectionResponse]

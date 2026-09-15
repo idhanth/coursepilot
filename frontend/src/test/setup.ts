@@ -1,7 +1,8 @@
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
 
-// Remove whatever a test rendered before the next test starts.
 afterEach(() => {
+  // Remove whatever a test rendered, and any token it saved, before the next test starts.
   cleanup()
+  localStorage.clear()
 })

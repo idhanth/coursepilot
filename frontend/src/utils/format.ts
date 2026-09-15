@@ -3,6 +3,11 @@ import type { Meeting } from '../types/course.ts'
 // Index = day_of_week (0 = Monday). R is Thursday, as in most course catalogs.
 const DAY_LETTERS = ['M', 'T', 'W', 'R', 'F', 'S', 'U']
 
+/** "2026-09-15T12:01:47-04:00" -> "Sep 15, 2026" (in the viewer's time zone) */
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 /** "13:50:00" -> "1:50 PM" */
 export function formatTime(value: string): string {
   const [hours, minutes] = value.split(':').map(Number)

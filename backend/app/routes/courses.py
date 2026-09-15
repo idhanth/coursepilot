@@ -1,17 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import DatabaseId
 from app.schemas.course import CourseResponse, SectionResponse
 from app.services import course_service
 
 router = APIRouter(prefix="/api", tags=["courses"])
-
-# Ids are PostgreSQL INTEGER columns, which stop at 2,147,483,647. Checking the range here returns
-# a 422 for an impossible id instead of letting the database query fail with a server error.
-DatabaseId = Annotated[int, Path(ge=1, le=2_147_483_647)]
 
 
 @router.get("/courses", response_model=list[CourseResponse])

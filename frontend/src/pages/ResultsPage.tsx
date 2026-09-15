@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import EmptyState from '../components/EmptyState.tsx'
+import SaveScheduleForm from '../components/SaveScheduleForm.tsx'
 import ScheduleCard from '../components/ScheduleCard.tsx'
 import ScheduleNavigator from '../components/ScheduleNavigator.tsx'
 import WeeklyCalendar from '../components/WeeklyCalendar.tsx'
@@ -173,8 +174,10 @@ function ShownSchedule({ response, position, onPositionChange }: GeneratedResult
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <WeeklyCalendar schedule={schedule} />
         {/* On small screens the text summary comes first; the calendar follows. */}
-        <div className="order-first lg:order-none">
+        <div className="order-first space-y-4 lg:order-none">
           <ScheduleCard schedule={schedule} />
+          {/* key={position} gives each schedule a fresh save form when the student moves to another one. */}
+          <SaveScheduleForm key={position} schedule={schedule} />
         </div>
       </div>
     </div>

@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AuthContextValue } from '../auth/AuthContext.ts'
 import { ApiError } from '../services/api.ts'
+import { saveSchedule } from '../services/savedSchedules.ts'
 import { generateSchedules } from '../services/schedules.ts'
+import { withAuth } from '../test/auth.ts'
 import type { Course } from '../types/course.ts'
 import {
   EMPTY_PREFERENCES,
@@ -14,7 +17,14 @@ import ResultsPage from './ResultsPage.tsx'
 
 // Replace the real API call, so each test decides what the "backend" returns.
 vi.mock('../services/schedules.ts', () => ({ generateSchedules: vi.fn() }))
+vi.mock('../services/savedSchedules.ts', () => ({
+  saveSchedule: vi.fn(),
+  listSavedSchedules: vi.fn(),
+  getSavedSchedule: vi.fn(),
+  deleteSavedSchedule: vi.fn(),
+}))
 const mockGenerateSchedules = vi.mocked(generateSchedules)
+const mockSaveSchedule = vi.mocked(saveSchedule)
 
 const COURSES: Course[] = [
   { id: 2, course_code: 'CSCI 1302', course_name: 'Software Development', department: 'Computer Science', description: null, credit_hours: 4 },
@@ -64,11 +74,18 @@ function backendResponse(counts: { total: number; conflictFree: number }, schedu
   }
 }
 
-function renderResults(selectedCourses: Course[] = COURSES, preferences: PreferenceForm = EMPTY_PREFERENCES) {
+function renderResults(
+  selectedCourses: Course[] = COURSES,
+  preferences: PreferenceForm = EMPTY_PREFERENCES,
+  auth: Partial<AuthContextValue> = {},
+) {
   render(
-    <MemoryRouter>
-      <ResultsPage selectedCourses={selectedCourses} preferences={preferences} />
-    </MemoryRouter>,
+    withAuth(
+      <MemoryRouter>
+        <ResultsPage selectedCourses={selectedCourses} preferences={preferences} />
+      </MemoryRouter>,
+      auth,
+    ),
   )
 }
 
@@ -78,6 +95,57 @@ function counts() {
 
 beforeEach(() => {
   mockGenerateSchedules.mockReset()
+  mockSaveSchedule.mockReset()
+})
+
+describe('Saving the displayed schedule', () => {
+  it('sends the name, semester and the section ids of the schedule on screen', async () => {
+    mockGenerateSchedules.mockResolvedValue(
+      backendResponse({ total: 81, conflictFree: 63 }, [schedule('001'), schedule('002'), schedule('003')]),
+    )
+    mockSaveSchedule.mockResolvedValue({
+      id: 42,
+      name: 'Fall 2027 - Late Start',
+      semester: 'Fall 2027',
+      created_at: '2026-09-15T16:00:00Z',
+      course_codes: ['CSCI 1302', 'MATH 2250'],
+      total_credits: 8,
+      sections: schedule('002').sections,
+    })
+    renderResults()
+    await screen.findByText('Schedule 1 of 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' })) // now showing schedule 2
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: ' Fall 2027 - Late Start ' } })
+    fireEvent.change(screen.getByLabelText('Semester'), { target: { value: 'Fall 2027' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save Schedule' })))
+
+    // Schedule 2's sections are CSCI 1302-002 (id 2) and MATH 2250-003 (id 100).
+    expect(mockSaveSchedule).toHaveBeenCalledWith({ name: 'Fall 2027 - Late Start', semester: 'Fall 2027', section_ids: [2, 100] })
+    expect(mockGenerateSchedules).toHaveBeenCalledTimes(1) // saving doesn't regenerate
+    expect(screen.getByText('Saved “Fall 2027 - Late Start”.')).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Open saved schedule' }).getAttribute('href')).toBe('/saved/42')
+  })
+
+  it('needs a name and a semester before saving', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
+    renderResults()
+    await screen.findByText('Schedule 1 of 1')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Schedule' }))
+
+    expect(screen.getByText('Enter a name and a semester.')).toBeDefined()
+    expect(mockSaveSchedule).not.toHaveBeenCalled()
+  })
+
+  it('asks a logged-out user to log in instead of showing the form', async () => {
+    mockGenerateSchedules.mockResolvedValue(backendResponse({ total: 9, conflictFree: 7 }, [schedule('001')]))
+    renderResults(COURSES, EMPTY_PREFERENCES, { user: null })
+    await screen.findByText('Schedule 1 of 1')
+
+    expect(screen.getByRole('link', { name: 'Log in' }).getAttribute('href')).toBe('/login')
+    expect(screen.queryByRole('button', { name: 'Save Schedule' })).toBeNull()
+  })
 })
 
 describe('ResultsPage', () => {

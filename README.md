@@ -11,7 +11,8 @@ your preferences, and shows the valid schedules on a weekly calendar.
 > course catalog and build a course selection. The backend can detect time conflicts between
 > sections and generate every conflict-free schedule for a set of courses, filtered by optional
 > time and day preferences. The frontend runs the whole flow: search, select, set preferences,
-> generate, and browse the results on a weekly calendar. Features are being built in the phases described in
+> generate, and browse the results on a weekly calendar. Logged-in students can save schedules and
+> open or delete them from a dashboard. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -197,6 +198,23 @@ either keeps a schedule or removes it; nothing is ranked. Leaving a preference o
 Malformed values, a `latest_end` that isn't after `earliest_start`, and unknown preference names
 return 422.
 
+### Saved schedules
+
+Every saved-schedule endpoint requires `Authorization: Bearer <token>` and only ever reads or changes
+the logged-in user's own schedules.
+
+| Endpoint                           | Description                                                          |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| `GET /api/schedules/saved`         | The user's saved schedules, newest first                             |
+| `POST /api/schedules/saved`        | Save `{ "name", "semester", "section_ids" }` → the saved schedule (201) |
+| `GET /api/schedules/saved/{id}`    | One saved schedule with its sections and meeting times               |
+| `DELETE /api/schedules/saved/{id}` | Delete one saved schedule (204)                                      |
+
+Saving stores the given sections in `saved_schedule_sections`; nothing is regenerated. The sections
+must exist (404 otherwise), be different, belong to different courses, and not conflict (422
+otherwise). Asking for another user's schedule returns the same 404 as a schedule that doesn't
+exist.
+
 ## Frontend flow
 
 | Page                | What happens                                                                        |
@@ -204,12 +222,21 @@ return 422.
 | `/courses`          | Search the catalog, view sections, and add courses to the selection                 |
 | `/planner`          | Review the selection and set the 4 optional preferences                             |
 | `/results`          | Calls `POST /api/schedules/generate` and shows one schedule at a time with its counts |
+| `/register`, `/login` | Create an account or log in                                                       |
+| `/dashboard`        | The user's saved schedules, with Open, Delete and Log out (login required)          |
+| `/saved/:id`        | One saved schedule on the same weekly calendar (login required)                      |
 
 The selection and preferences are React state in `App.tsx`, passed to the pages as props, so every
 page sees the same values (a page refresh clears them). The results page shows the backend's three
 counts, a section list and a weekly calendar for the current schedule, with Previous and Next to
 move through the rest. When nothing is returned, it uses the counts to say whether the courses
 conflict (`conflict_free_count` is 0) or the preferences removed every schedule.
+
+Logging in stores the JWT from `POST /api/auth/login` in `localStorage`. `AuthProvider` checks it with
+`GET /api/auth/me` when the app loads, so a refresh keeps the user logged in. Requests to protected
+endpoints add the `Authorization: Bearer <token>` header; if one is rejected with 401, the token is
+removed and the user is logged out. Logging out deletes the stored token. Generated schedules are
+kept only in memory until they are saved.
 
 ## Tests
 
