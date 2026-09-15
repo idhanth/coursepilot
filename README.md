@@ -6,8 +6,9 @@ your preferences, and shows the valid schedules on a weekly calendar.
 
 **Stack:** React · TypeScript · Vite · Tailwind CSS · FastAPI · SQLAlchemy · PostgreSQL
 
-> Status: early development — the frontend, backend and database are connected. Features are
-> being built in the phases described in [docs/PRD.md](docs/PRD.md#41-development-plan).
+> Status: early development — the frontend, backend and database are connected, and the
+> database schema is in place. Features are being built in the phases described in
+> [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
 
@@ -45,6 +46,8 @@ If you use a different server, set `DATABASE_URL` in `backend/.env` (see `backen
 cd backend
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/alembic upgrade head          # create or update the tables
+.venv/bin/python -m app.seed            # load sample courses (skipped if courses exist)
 .venv/bin/uvicorn app.main:app --reload --port 8020
 ```
 
@@ -62,6 +65,30 @@ During development Vite forwards `/api` requests to the backend, so no extra con
 needed. Open http://localhost:5173 — the status card should show the backend and database as
 connected.
 
+## Database schema
+
+Six tables, defined as SQLAlchemy models in [backend/app/models/](backend/app/models/) and created
+by Alembic migrations in [backend/alembic/versions/](backend/alembic/versions/).
+
+| Table                     | Holds                                   | Relationships                                   |
+| ------------------------- | --------------------------------------- | ----------------------------------------------- |
+| `users`                   | name, unique email, password hash       | one user → many saved schedules                 |
+| `courses`                 | unique course code, name, department    | one course → many sections                      |
+| `sections`                | section number, instructor, location    | one section → many meetings                     |
+| `section_meetings`        | day of week, start time, end time       | a MWF section has 3 rows                        |
+| `saved_schedules`         | name, semester, owner                   | many-to-many with sections                      |
+| `saved_schedule_sections` | (schedule, section) pairs               | join table for that many-to-many                |
+
+Deleting a course deletes its sections and meetings; deleting a user deletes their saved
+schedules. A section that appears in a saved schedule cannot be deleted.
+
+After changing a model, create a migration, review it, and apply it:
+
+```bash
+.venv/bin/alembic revision --autogenerate -m "describe the change"
+.venv/bin/alembic upgrade head
+```
+
 ## Tests
 
 ```bash
@@ -69,7 +96,8 @@ cd backend
 .venv/bin/pytest
 ```
 
-The tests use the `coursepilot_test` database. Point them elsewhere with `TEST_DATABASE_URL`.
+The tests use the `coursepilot_test` database, which they rebuild from the migrations on every
+run. Point them elsewhere with `TEST_DATABASE_URL`.
 
 ## Environment variables
 

@@ -1,15 +1,48 @@
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.database import get_db
 from app.main import app
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://127.0.0.1:5435/coursepilot_test")
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+
+
+def alembic_config() -> Config:
+    """Alembic settings from backend/alembic.ini, pointed at the test database."""
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
+    return config
+
+
+@pytest.fixture(scope="session")
+def engine() -> Iterator[Engine]:
+    # Rebuild the test database from the migrations once per test run,
+    # so the tests always check the schema that the migrations actually create.
+    config = alembic_config()
+    command.downgrade(config, "base")
+    command.upgrade(config, "head")
+
+    engine = create_engine(TEST_DATABASE_URL)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def db(engine: Engine) -> Iterator[Session]:
+    """A session on an empty database. TRUNCATE ... CASCADE also empties every table that references these two."""
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE users, courses RESTART IDENTITY CASCADE"))
+    with Session(engine, expire_on_commit=False) as session:
+        yield session
 
 
 def client_for(database_url: str) -> TestClient:
