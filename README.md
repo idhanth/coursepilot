@@ -9,7 +9,8 @@ your preferences, and shows the valid schedules on a weekly calendar.
 > Status: early development — the frontend, backend and database are connected, the database
 > schema is in place, the API supports registration, login and JWT authentication, and students can search the
 > course catalog and build a course selection. The backend can detect time conflicts between
-> sections and generate every conflict-free schedule for a set of courses. Features are being built in the phases described in
+> sections and generate every conflict-free schedule for a set of courses, filtered by optional
+> time and day preferences. Features are being built in the phases described in
 > [docs/PRD.md](docs/PRD.md#41-development-plan).
 
 ## Project layout
@@ -158,6 +159,7 @@ MWF 10:20):
 ```json
 {
   "total_combinations": 27,
+  "conflict_free_count": 24,
   "count": 24,
   "schedules": [{ "sections": ["…one section per course, with its course and meetings…"], "total_credits": 11 }]
 }
@@ -165,6 +167,34 @@ MWF 10:20):
 
 `course_ids` must contain 1–8 different course ids. Unknown ids return 404, and a course with no
 sections returns 422. If every combination conflicts, `count` is 0.
+
+#### Preferences
+
+An optional `preferences` object applies strict filters after conflicts are removed. Each one
+either keeps a schedule or removes it; nothing is ranked. Leaving a preference out removes nothing.
+
+```json
+{
+  "course_ids": [1, 2, 4],
+  "preferences": {
+    "earliest_start": "09:00",
+    "latest_end": "15:00",
+    "preferred_day_off": "Friday",
+    "max_classes_per_day": 3
+  }
+}
+```
+
+| Preference            | A schedule is removed if…                                  |
+| --------------------- | ---------------------------------------------------------- |
+| `earliest_start`      | any class starts before this time (`HH:MM`)                 |
+| `latest_end`          | any class ends after this time (`HH:MM`)                    |
+| `preferred_day_off`   | any class meets on this day (`"Monday"` … `"Sunday"`)       |
+| `max_classes_per_day` | any day has more than this many classes (a positive number) |
+
+`conflict_free_count` is the number of schedules before preferences and `count` the number after.
+Malformed values, a `latest_end` that isn't after `earliest_start`, and unknown preference names
+return 422.
 
 ## Tests
 

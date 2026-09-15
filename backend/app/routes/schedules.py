@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.schedule import GenerateSchedulesRequest, GenerateSchedulesResponse
 from app.services import course_service
-from app.services.schedule_service import generate_valid_schedules
+from app.services.schedule_service import apply_preferences, generate_valid_schedules
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
@@ -34,17 +34,21 @@ def generate_schedules(data: GenerateSchedulesRequest, db: Session = Depends(get
         )
 
     # 3. Build every one-section-per-course combination and keep those with no conflicts.
-    valid_schedules = generate_valid_schedules(course_sections)
+    conflict_free_schedules = generate_valid_schedules(course_sections)
+
+    # 4. Keep the conflict-free schedules that pass every preference given (omitted ones remove nothing).
+    matching_schedules = apply_preferences(conflict_free_schedules, data.preferences)
 
     return {
         # The number of combinations is the product of the section counts, e.g. 3 x 3 x 3 = 27.
         "total_combinations": prod(len(sections) for sections in course_sections),
-        "count": len(valid_schedules),
+        "conflict_free_count": len(conflict_free_schedules),
+        "count": len(matching_schedules),
         "schedules": [
             {
                 "sections": list(schedule),
                 "total_credits": sum(section.course.credit_hours for section in schedule),
             }
-            for schedule in valid_schedules
+            for schedule in matching_schedules
         ],
     }
